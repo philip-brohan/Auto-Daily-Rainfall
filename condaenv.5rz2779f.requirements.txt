@@ -1,0 +1,9 @@
+-e .
+accelerate
+datasets
+huggingface_hub
+peft
+torch
+torchvision
+transformers
+trl
