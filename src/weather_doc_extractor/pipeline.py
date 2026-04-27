@@ -36,10 +36,38 @@ def run_evaluation(
     config: AppConfig,
     limit: int | None = None,
     tolerance: float = 0.005,
+    shard: int | None = None,
+    total_shards: int | None = None,
 ) -> EvaluationReport:
-    """Run the model over paired records and return an EvaluationReport."""
+    """Run the model over paired records and return an EvaluationReport.
+
+    Parameters
+    ----------
+    shard:
+        1-based index of this shard (e.g. 1 of 4).  When provided together
+        with *total_shards* the paired records are evenly partitioned and
+        only this shard's slice is evaluated.  Useful for Azure Batch job
+        arrays where each task sets ``--shard $AZ_BATCH_TASK_ID`` and
+        ``--total-shards <pool_size>``.
+    total_shards:
+        Total number of shards.  Must be provided when *shard* is set.
+    """
     records = scan_records(config.ingest.images_dir, config.ingest.transcriptions_dir)
+    paired = [r for r in records if r.grid is not None]
+    if shard is not None and total_shards is not None:
+        paired = _shard_list(paired, shard, total_shards)
+        records = paired  # evaluate_dataset will re-filter, so pass paired directly
     return evaluate_dataset(records, config, tolerance=tolerance, limit=limit)
+
+
+def _shard_list(items: list, shard: int, total_shards: int) -> list:
+    """Return the slice of *items* belonging to 1-based *shard* of *total_shards*."""
+    if total_shards < 1:
+        raise ValueError(f"total_shards must be >= 1, got {total_shards}")
+    if not (1 <= shard <= total_shards):
+        raise ValueError(f"shard must be in 1..{total_shards}, got {shard}")
+    indices = range(shard - 1, len(items), total_shards)
+    return [items[i] for i in indices]
 
 
 def extract_from_image(

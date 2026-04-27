@@ -52,6 +52,7 @@ nav:
     - Fine-tuning: guide/finetuning.md
     - Evaluation: guide/evaluation.md
     - Visualisation: guide/visualisation.md
+    - HPC and Azure: guide/hpc-azure.md
   - Reference:
     - CLI Reference: reference/cli.md
     - Configuration: reference/configuration.md

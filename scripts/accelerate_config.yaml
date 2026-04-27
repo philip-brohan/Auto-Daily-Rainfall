@@ -1,0 +1,28 @@
+# accelerate_config.yaml — Multi-GPU training config for Azure Batch GPU nodes.
+#
+# Designed for a single node with multiple NVIDIA GPUs (e.g. Standard_NC96ads_A100_v4
+# with 4× A100 80 GB, or Standard_ND96asr_v4 with 8× A100 40 GB).
+#
+# Usage:
+#   accelerate launch --config_file scripts/accelerate_config.yaml \
+#       -m weather_doc_extractor.cli finetune [args...]
+#
+# Adjust num_processes to match the GPU count of your Azure VM SKU.
+# For distributed multi-node runs, switch distributed_type to MULTI_GPU
+# and configure machine_rank / num_machines accordingly.
+
+compute_environment: LOCAL_MACHINE
+distributed_type: MULTI_GPU
+downcast_bf16: 'no'
+gpu_ids: all
+machine_rank: 0
+main_training_function: main
+mixed_precision: bf16
+num_machines: 1
+num_processes: 4         # Set to the number of GPUs on the node
+rdzv_backend: static
+same_network: true
+tpu_env: []
+tpu_use_cluster: false
+tpu_use_sudo: false
+use_cpu: false

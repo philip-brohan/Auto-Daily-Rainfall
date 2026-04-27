@@ -99,9 +99,7 @@ def build_training_examples(
 
     Records without a transcription (``grid is None``) are silently skipped.
     """
-    return [
-        build_training_example(r, family) for r in records if r.grid is not None
-    ]
+    return [build_training_example(r, family) for r in records if r.grid is not None]
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +233,9 @@ def run_finetune(
     paired = [r for r in records if r.grid is not None]
 
     if not paired:
-        raise ValueError("No paired records found; cannot fine-tune without ground truth.")
+        raise ValueError(
+            "No paired records found; cannot fine-tune without ground truth."
+        )
 
     # Train / eval split
     n_eval = max(1, int(len(paired) * train_config.eval_split))
@@ -290,7 +290,7 @@ def run_finetune(
         logging_steps=10,
         fp16=False,
         bf16=torch.cuda.is_available() and dtype == torch.bfloat16,
-        report_to="none",
+        report_to=train_config.report_to,
     )
 
     collate_fn = _make_collate_fn(processor, family)

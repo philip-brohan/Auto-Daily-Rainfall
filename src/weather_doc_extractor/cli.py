@@ -65,11 +65,17 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "extract":
         if len(args) < 2:
-            print("Usage: extract [--model smolvlm|granite|<hf-id>] <image_path>", file=sys.stderr)
+            print(
+                "Usage: extract [--model smolvlm|granite|<hf-id>] <image_path>",
+                file=sys.stderr,
+            )
             return 1
         remaining = _parse_model_flag(list(args[1:]), config)
         if not remaining:
-            print("Usage: extract [--model smolvlm|granite|<hf-id>] <image_path>", file=sys.stderr)
+            print(
+                "Usage: extract [--model smolvlm|granite|<hf-id>] <image_path>",
+                file=sys.stderr,
+            )
             return 1
         image_path = Path(remaining[0])
         if not image_path.exists():
@@ -78,7 +84,9 @@ def run(argv: list[str] | None = None) -> int:
         print(f"Extracting from {image_path} using {config.model.model_name} …")
         grid, raw = extract_from_image(image_path, config)
         if grid is None:
-            print("Extraction failed — could not parse model response.", file=sys.stderr)
+            print(
+                "Extraction failed — could not parse model response.", file=sys.stderr
+            )
             print("Raw model output:", file=sys.stderr)
             print(raw, file=sys.stderr)
             return 1
@@ -87,8 +95,12 @@ def run(argv: list[str] | None = None) -> int:
 
     if command == "evaluate":
         # Optional args: --model <name>  --limit N  --tolerance F
+        #                --shard N  --total-shards M  --output-file PATH
         limit: int | None = None
         tolerance = 0.005
+        shard: int | None = None
+        total_shards: int | None = None
+        output_file: Path | None = None
         remaining = _parse_model_flag(list(args[1:]), config)
         while remaining:
             flag = remaining.pop(0)
@@ -96,19 +108,49 @@ def run(argv: list[str] | None = None) -> int:
                 limit = int(remaining.pop(0))
             elif flag == "--tolerance" and remaining:
                 tolerance = float(remaining.pop(0))
+            elif flag == "--shard" and remaining:
+                shard = int(remaining.pop(0))
+            elif flag == "--total-shards" and remaining:
+                total_shards = int(remaining.pop(0))
+            elif flag == "--output-file" and remaining:
+                output_file = Path(remaining.pop(0))
+        if (shard is None) != (total_shards is None):
+            print("--shard and --total-shards must be used together", file=sys.stderr)
+            return 1
         print(f"Evaluating with model: {config.model.model_name}")
         if limit:
             print(f"Limiting to {limit} images")
-        report = run_evaluation(config, limit=limit, tolerance=tolerance)
-        print(json.dumps(report.summary(), indent=2, default=str))
+        if shard is not None:
+            print(f"Shard {shard}/{total_shards}")
+        report = run_evaluation(
+            config,
+            limit=limit,
+            tolerance=tolerance,
+            shard=shard,
+            total_shards=total_shards,
+        )
+        summary = report.summary()
+        print(json.dumps(summary, indent=2, default=str))
         if report.comparisons:
             print("\nPer-image results:")
             for c in report.comparisons:
                 print(json.dumps(c.summary(), indent=2, default=str))
+        if output_file is not None:
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "summary": summary,
+                "comparisons": [c.summary() for c in report.comparisons],
+            }
+            if shard is not None:
+                payload["shard"] = shard
+                payload["total_shards"] = total_shards
+            output_file.write_text(json.dumps(payload, indent=2, default=str))
+            print(f"\nReport written to: {output_file}")
         return 0
 
     if command == "finetune":
         # Optional args: --model <name>  --epochs N  --output-dir PATH  --eval-split F
+        #                --lora-r N  --report-to wandb|tensorboard|none
         remaining = _parse_model_flag(list(args[1:]), config)
         while remaining:
             flag = remaining.pop(0)
@@ -116,13 +158,17 @@ def run(argv: list[str] | None = None) -> int:
                 config.training.epochs = int(remaining.pop(0))
             elif flag == "--output-dir" and remaining:
                 from pathlib import Path as _Path
+
                 config.training.output_dir = _Path(remaining.pop(0))
             elif flag == "--eval-split" and remaining:
                 config.training.eval_split = float(remaining.pop(0))
             elif flag == "--lora-r" and remaining:
                 config.training.lora_r = int(remaining.pop(0))
+            elif flag == "--report-to" and remaining:
+                config.training.report_to = remaining.pop(0)
         print(f"Fine-tuning model: {config.model.model_name}")
         print(f"Epochs: {config.training.epochs}  |  LoRA r={config.training.lora_r}")
+        print(f"Reporting to: {config.training.report_to}")
         output_dir = run_finetune(config)
         print(f"Adapter saved to: {output_dir}")
         return 0
@@ -152,8 +198,10 @@ def run(argv: list[str] | None = None) -> int:
                 i += 1
 
         if not filtered:
-            print("Usage: visualize [--model X] [--output PATH] [--ground-truth PATH] <image_path>",
-                  file=sys.stderr)
+            print(
+                "Usage: visualize [--model X] [--output PATH] [--ground-truth PATH] <image_path>",
+                file=sys.stderr,
+            )
             return 1
 
         image_path = Path(filtered[0])
@@ -163,15 +211,22 @@ def run(argv: list[str] | None = None) -> int:
 
         # Derive output path from image stem if not given
         if output_path is None:
-            output_path = Path("outputs") / "figures" / (image_path.stem + "_figure.png")
+            output_path = (
+                Path("outputs") / "figures" / (image_path.stem + "_figure.png")
+            )
 
         # Load ground truth if provided, or look for a sibling JSON
         from weather_doc_extractor.ingest import load_grid
+
         ground_truth = None
         if gt_path is not None:
             ground_truth = load_grid(gt_path)
         else:
-            sibling = image_path.with_suffix(".json").parent.parent / "transcriptions" / image_path.with_suffix(".json").name
+            sibling = (
+                image_path.with_suffix(".json").parent.parent
+                / "transcriptions"
+                / image_path.with_suffix(".json").name
+            )
             if sibling.exists():
                 ground_truth = load_grid(sibling)
 
@@ -187,18 +242,28 @@ def run(argv: list[str] | None = None) -> int:
             ground_truth = None  # nothing to compare against
             print("No --model given; displaying ground-truth data.")
         else:
-            print("Provide --model to run extraction, or --ground-truth to display known data.",
-                  file=sys.stderr)
+            print(
+                "Provide --model to run extraction, or --ground-truth to display known data.",
+                file=sys.stderr,
+            )
             return 1
 
         from weather_doc_extractor.visualize import save_figure
-        saved = save_figure(image_path, grid, output_path, ground_truth=ground_truth,
-                            model_name=config.model.model_name if use_model else None)
+
+        saved = save_figure(
+            image_path,
+            grid,
+            output_path,
+            ground_truth=ground_truth,
+            model_name=config.model.model_name if use_model else None,
+        )
         print(f"Figure saved to: {saved}")
         return 0
 
     print(f"Unknown command: {command}")
-    print("Available commands: info, stages, ingest, extract, evaluate, finetune, visualize")
+    print(
+        "Available commands: info, stages, ingest, extract, evaluate, finetune, visualize"
+    )
     return 1
 
 
