@@ -6,10 +6,11 @@ fine-tuning.
 
 ## Overview
 
-The pipeline has two compute-intensive stages suited to HPC:
+The pipeline has three compute-intensive stages suited to HPC:
 
 | Stage | Parallelism | Recommended resource |
 |-------|-------------|----------------------|
+| `batch-extract` | Embarrassingly parallel — each image is independent | GPU job array |
 | `evaluate` | Embarrassingly parallel — each image is independent | CPU or GPU job array |
 | `finetune` | Single training run, benefits from multi-GPU | GPU node (multi-GPU) |
 
@@ -70,6 +71,89 @@ export WEATHER_IMAGES_DIR=/mnt/blob/Daily_rainfall_sample/images
 export WEATHER_TRANSCRIPTIONS_DIR=/mnt/blob/Daily_rainfall_sample/transcriptions
 export WEATHER_OUTPUT_DIR=/mnt/blob/outputs
 export HF_HOME=/mnt/blob/hf_cache
+```
+
+---
+
+## Bulk extraction with job arrays
+
+`batch-extract` runs the model over every image in `WEATHER_IMAGES_DIR` and
+writes one `<stem>.json` per image to an output directory.  Ground-truth
+transcriptions are **not** required — this is the right command when you want
+to extract data from new, unannotated images.
+
+### Output format
+
+Each file contains:
+
+```json
+{
+  "stem": "DRain_1871-1880_Cornwall-59",
+  "parse_failed": false,
+  "grid": {
+    "days": {"Day 1": [0.12, null, ...], ...},
+    "totals": [1.5, ...]
+  }
+}
+```
+
+If the model response could not be parsed, `parse_failed` is `true` and a
+`raw_text` field contains the raw model output for debugging.
+
+### Local test
+
+```bash
+weather-extract batch-extract \
+    --model smolvlm \
+    --output-dir outputs/extractions
+```
+
+### Sharded job array (Azure CLI)
+
+```bash
+POOL_ID=gpu-pool
+JOB_ID=extract-$(date +%Y%m%d-%H%M%S)
+TOTAL_SHARDS=8
+
+az batch job create \
+    --id "$JOB_ID" \
+    --pool-id "$POOL_ID"
+
+for i in $(seq 1 "$TOTAL_SHARDS"); do
+    az batch task create \
+        --job-id "$JOB_ID" \
+        --task-id "extract-shard-$i" \
+        --command-line "/bin/bash \$AZ_BATCH_NODE_SHARED_DIR/scripts/azure_extract_array.sh" \
+        --environment-settings \
+            "AZ_BATCH_TASK_ID=$((i - 1))" \
+            "TOTAL_SHARDS=$TOTAL_SHARDS" \
+            "WEATHER_IMAGES_DIR=/mnt/blob/Daily_rainfall_sample/images" \
+            "WEATHER_TRANSCRIPTIONS_DIR=/mnt/blob/Daily_rainfall_sample/transcriptions" \
+            "WEATHER_OUTPUT_DIR=/mnt/blob/outputs" \
+            "WEATHER_MODEL=smolvlm" \
+            "HF_HOME=/mnt/blob/hf_cache"
+done
+```
+
+The script `scripts/azure_extract_array.sh` wraps this automatically when
+used with native Azure Batch task arrays (where `$AZ_BATCH_TASK_ID` is
+injected by the service).
+
+### Collecting results
+
+After all tasks finish, the output directory contains one JSON per image.
+Load them all:
+
+```python
+import json, pathlib
+
+results = [
+    json.loads(p.read_text())
+    for p in sorted(pathlib.Path("outputs/extractions").glob("*.json"))
+]
+succeeded = [r for r in results if not r["parse_failed"]]
+failed    = [r for r in results if r["parse_failed"]]
+print(f"Extracted: {len(succeeded)}  Failed: {len(failed)}")
 ```
 
 ---

@@ -113,3 +113,62 @@ def describe_training_stage() -> str:
         "Fine-tune the selected model with TRL using labeled extraction "
         "examples and evaluate field-level accuracy."
     )
+
+
+def run_batch_extract(
+    config: AppConfig,
+    output_dir: Path,
+    shard: int | None = None,
+    total_shards: int | None = None,
+) -> dict[str, object]:
+    """Run inference on every image in the configured images directory.
+
+    Writes one ``<stem>.json`` per image to *output_dir*.  Images where the
+    model response cannot be parsed are recorded with ``"parse_failed": true``
+    and no grid data.
+
+    Parameters
+    ----------
+    output_dir:
+        Directory to write per-image JSON result files.
+    shard / total_shards:
+        When both are provided, only the ``shard``-th (1-based) of
+        ``total_shards`` equal slices of the image list is processed.
+        Allows parallel execution via an Azure Batch job array.
+
+    Returns
+    -------
+    dict
+        Summary with keys ``total``, ``succeeded``, ``failed``, ``output_dir``.
+    """
+    from weather_doc_extractor.inference import extract_grid
+
+    import json
+
+    records = scan_records(config.ingest.images_dir, config.ingest.transcriptions_dir)
+    if shard is not None and total_shards is not None:
+        records = _shard_list(records, shard, total_shards)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    succeeded = 0
+    failed = 0
+
+    for i, record in enumerate(records, 1):
+        print(f"  [{i}/{len(records)}] {record.stem} …", flush=True)
+        grid, raw_text = extract_grid(record.image_path, config.model)
+        if grid is not None:
+            result = {"stem": record.stem, "parse_failed": False, "grid": grid.to_dict()}
+            succeeded += 1
+        else:
+            result = {"stem": record.stem, "parse_failed": True, "raw_text": raw_text}
+            failed += 1
+            print(f"    WARNING: parse failed for {record.stem}")
+        out_path = output_dir / f"{record.stem}.json"
+        out_path.write_text(json.dumps(result, indent=2, default=str))
+
+    return {
+        "total": len(records),
+        "succeeded": succeeded,
+        "failed": failed,
+        "output_dir": str(output_dir),
+    }

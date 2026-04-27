@@ -11,6 +11,7 @@ from weather_doc_extractor.pipeline import (
     describe_ingest_stage,
     describe_training_stage,
     extract_from_image,
+    run_batch_extract,
     run_evaluation,
     run_finetune,
     run_ingest,
@@ -260,9 +261,41 @@ def run(argv: list[str] | None = None) -> int:
         print(f"Figure saved to: {saved}")
         return 0
 
+    if command == "batch-extract":
+        # Usage: batch-extract [--model X] [--output-dir PATH]
+        #                      [--shard N --total-shards M]
+        output_dir: Path = config.paths.outputs_dir / "extractions"
+        shard: int | None = None
+        total_shards: int | None = None
+        remaining = _parse_model_flag(list(args[1:]), config)
+        while remaining:
+            flag = remaining.pop(0)
+            if flag == "--output-dir" and remaining:
+                output_dir = Path(remaining.pop(0))
+            elif flag == "--shard" and remaining:
+                shard = int(remaining.pop(0))
+            elif flag == "--total-shards" and remaining:
+                total_shards = int(remaining.pop(0))
+        if (shard is None) != (total_shards is None):
+            print("--shard and --total-shards must be used together", file=sys.stderr)
+            return 1
+        print(f"Batch extraction with model: {config.model.model_name}")
+        print(f"Writing results to: {output_dir}")
+        if shard is not None:
+            print(f"Shard {shard}/{total_shards}")
+        summary = run_batch_extract(
+            config,
+            output_dir=output_dir,
+            shard=shard,
+            total_shards=total_shards,
+        )
+        print(json.dumps(summary, indent=2, default=str))
+        return 0
+
     print(f"Unknown command: {command}")
     print(
-        "Available commands: info, stages, ingest, extract, evaluate, finetune, visualize"
+        "Available commands: info, stages, ingest, extract, batch-extract, "
+        "evaluate, finetune, visualize"
     )
     return 1
 
