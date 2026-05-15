@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Architecture &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="Configuration Reference" href="configuration.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="configuration.html" title="Configuration Reference"
+             accesskey="P">previous</a></li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Architecture</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="architecture">
+<h1>Architecture<a class="headerlink" href="#architecture" title="Link to this heading">¶</a></h1>
+<section id="module-overview">
+<h2>Module overview<a class="headerlink" href="#module-overview" title="Link to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>src/weather_doc_extractor/
+├── cli.py          Entry point — routes CLI commands
+├── config.py       Dataclasses: AppConfig, ModelConfig, TrainingConfig, …
+├── schemas.py      DailyRainfallGrid data model
+├── ingest.py       Scan images/transcriptions → DatasetRecord list
+├── inference.py    Load model, run extraction, parse JSON response
+├── evaluate.py     Compare extracted grids to ground truth
+├── finetune.py     LoRA fine-tuning with TRL SFTTrainer
+├── pipeline.py     Orchestration: wraps the above into single-call functions
+└── visualize.py    Diagnostic figure generation (matplotlib)
+</pre></div>
+</div>
+</section>
+<section id="data-flow">
+<h2>Data flow<a class="headerlink" href="#data-flow" title="Link to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>images/ + transcriptions/
+         │
+         ▼
+      ingest.py
+    DatasetRecord[]
+         │
+    ┌────┴────────────────────────────────────┐
+    │                                         │
+    ▼                                         ▼
+inference.py                            finetune.py
+  DailyRainfallGrid                     LoRA adapter
+         │                                    │
+         ▼                                    │
+   evaluate.py ◄──────────────────────────────┘
+   EvalReport
+         │
+         ▼
+   visualize.py
+   diagnostic PNG
+</pre></div>
+</div>
+</section>
+<section id="key-design-decisions">
+<h2>Key design decisions<a class="headerlink" href="#key-design-decisions" title="Link to this heading">¶</a></h2>
+<section id="model-agnostic-inference">
+<h3>Model-agnostic inference<a class="headerlink" href="#model-agnostic-inference" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">inference.py</span></code> detects the model family (<code class="docutils literal notranslate"><span class="pre">smolvlm</span></code> or <code class="docutils literal notranslate"><span class="pre">granite</span></code>) from the model
+name and applies the appropriate chat template and image tokenisation.  New
+model families can be added by extending <code class="docutils literal notranslate"><span class="pre">detect_model_family()</span></code> and the
+collate function in <code class="docutils literal notranslate"><span class="pre">finetune.py</span></code>.</p>
+</section>
+<section id="lora-adapter-detection">
+<h3>LoRA adapter detection<a class="headerlink" href="#lora-adapter-detection" title="Link to this heading">¶</a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">--model</span></code> points to a local directory containing <code class="docutils literal notranslate"><span class="pre">adapter_config.json</span></code>,
+the code automatically:</p>
+<ol class="arabic simple">
+<li><p>Reads the base model name from <code class="docutils literal notranslate"><span class="pre">adapter_config[&quot;base_model_name_or_path&quot;]</span></code>.</p></li>
+<li><p>Loads the base model.</p></li>
+<li><p>Wraps it with <code class="docutils literal notranslate"><span class="pre">PeftModel.from_pretrained(base,</span> <span class="pre">adapter_dir)</span></code>.</p></li>
+</ol>
+<p>This means the same <code class="docutils literal notranslate"><span class="pre">--model</span></code> flag works for both base models and fine-tuned
+adapters with no extra flags required.</p>
+</section>
+<section id="training-example-construction">
+<h3>Training example construction<a class="headerlink" href="#training-example-construction" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">finetune.py</span></code> builds training examples in the format expected by each model
+family:</p>
+<ul class="simple">
+<li><p><strong>SmolVLM</strong> — uses an <code class="docutils literal notranslate"><span class="pre">{&quot;type&quot;:</span> <span class="pre">&quot;image&quot;}</span></code> placeholder in the content list;
+the processor resolves the placeholder to pixel values.</p></li>
+<li><p><strong>Granite</strong> — embeds the PIL image object directly in the content list.</p></li>
+</ul>
+</section>
+<section id="visualisation-positioning">
+<h3>Visualisation positioning<a class="headerlink" href="#visualisation-positioning" title="Link to this heading">¶</a></h3>
+<p>All panel sizing and positioning in <code class="docutils literal notranslate"><span class="pre">visualize.py</span></code> is done via <code class="docutils literal notranslate"><span class="pre">fig.add_axes()</span></code>
+coordinates.  The <code class="docutils literal notranslate"><span class="pre">ax.table()</span></code> <code class="docutils literal notranslate"><span class="pre">bbox</span></code> parameter is always <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1]</span></code> (fill
+the axes).  This avoids double-applying offsets.</p>
+</section>
+</section>
+<section id="testing">
+<h2>Testing<a class="headerlink" href="#testing" title="Link to this heading">¶</a></h2>
+<p>Tests live in <code class="docutils literal notranslate"><span class="pre">tests/</span></code> and use <code class="docutils literal notranslate"><span class="pre">pytest</span></code>.  Every module has a corresponding test
+file.  Tests avoid loading real models by mocking <code class="docutils literal notranslate"><span class="pre">transformers</span></code> calls.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>/path/to/weather-doc-extractor/bin/pytest<span class="w"> </span>tests/<span class="w"> </span>-q
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/ingest.html">Data Ingest</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/extraction.html">Extraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/evaluation.html">Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/visualisation.html">Visualisation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-overview">Module overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#data-flow">Data flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#key-design-decisions">Key design decisions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#testing">Testing</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/reference/architecture.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="configuration.html" title="Configuration Reference"
+             >previous</a></li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Architecture</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Evaluation &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Visualisation" href="visualisation.html" />
+    <link rel="prev" title="Fine-tuning" href="finetuning.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="visualisation.html" title="Visualisation"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="finetuning.html" title="Fine-tuning"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Evaluation</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="evaluation">
+<h1>Evaluation<a class="headerlink" href="#evaluation" title="Link to this heading">¶</a></h1>
+<p>The evaluation stage runs extraction over all paired images and compares the
+model’s output against the human transcriptions.</p>
+<section id="running-evaluation">
+<h2>Running evaluation<a class="headerlink" href="#running-evaluation" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>evaluate<span class="w"> </span>--model<span class="w"> </span>smolvlm
+</pre></div>
+</div>
+<section id="options">
+<h3>Options<a class="headerlink" href="#options" title="Link to this heading">¶</a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Flag</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--model</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">smolvlm</span></code></p></td>
+<td><p>Model or adapter path</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--limit</span></code></p></td>
+<td><p><em>(all)</em></p></td>
+<td><p>Maximum number of images to evaluate</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--tolerance</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.005</span></code></p></td>
+<td><p>Absolute tolerance (inches) for a cell to count as correct</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="output">
+<h2>Output<a class="headerlink" href="#output" title="Link to this heading">¶</a></h2>
+<p>The command prints a JSON summary followed by per-image results:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;total_images&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">18</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;successful_extractions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;failed_extractions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;cell_accuracy&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.842</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;mean_absolute_error&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.31</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">cell_accuracy</span></code> is the fraction of non-null data cells whose extracted value
+matches the ground truth within the given tolerance.</p>
+</section>
+<section id="evaluating-a-fine-tuned-adapter">
+<h2>Evaluating a fine-tuned adapter<a class="headerlink" href="#evaluating-a-fine-tuned-adapter" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span>outputs/checkpoints/HuggingFaceTB--SmolVLM-500M-Instruct
+</pre></div>
+</div>
+</section>
+<section id="limiting-to-a-subset">
+<h2>Limiting to a subset<a class="headerlink" href="#limiting-to-a-subset" title="Link to this heading">¶</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">--limit</span></code> to do a quick sanity-check on the first few images:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>evaluate<span class="w"> </span>--model<span class="w"> </span>smolvlm<span class="w"> </span>--limit<span class="w"> </span><span class="m">3</span>
+</pre></div>
+</div>
+</section>
+<section id="per-image-breakdown">
+<h2>Per-image breakdown<a class="headerlink" href="#per-image-breakdown" title="Link to this heading">¶</a></h2>
+<p>After the summary, each image’s result is printed separately, including which
+specific cells were mismatched.  Redirect to a file for later analysis:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>evaluate<span class="w"> </span>--model<span class="w"> </span>smolvlm<span class="w"> </span>&gt;<span class="w"> </span>outputs/eval_baseline.json
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ingest.html">Data Ingest</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extraction.html">Extraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Evaluation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#running-evaluation">Running evaluation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#output">Output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#evaluating-a-fine-tuned-adapter">Evaluating a fine-tuned adapter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#limiting-to-a-subset">Limiting to a subset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#per-image-breakdown">Per-image breakdown</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="visualisation.html">Visualisation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/guide/evaluation.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="visualisation.html" title="Visualisation"
+             >next</a></li>
+        <li class="right" >
+          <a href="finetuning.html" title="Fine-tuning"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Evaluation</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

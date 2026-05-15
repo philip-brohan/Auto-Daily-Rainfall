@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Quick Start &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css?v=34905f61" />
+    <script src="_static/documentation_options.js?v=01f34227"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Data Ingest" href="guide/ingest.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="guide/ingest.html" title="Data Ingest"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="installation.html" title="Installation"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Quick Start</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="quick-start">
+<h1>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h1>
+<p>This page walks through the most common workflow end-to-end.</p>
+<section id="inspect-the-sample-data">
+<h2>1 — Inspect the sample data<a class="headerlink" href="#inspect-the-sample-data" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>ingest
+</pre></div>
+</div>
+<p>Output shows how many image/transcription pairs were found in
+<code class="docutils literal notranslate"><span class="pre">Daily_rainfall_sample/</span></code>.</p>
+</section>
+<section id="extract-a-single-image-baseline-model">
+<h2>2 — Extract a single image (baseline model)<a class="headerlink" href="#extract-a-single-image-baseline-model" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>extract<span class="w"> </span>--model<span class="w"> </span>smolvlm<span class="w"> </span>Daily_rainfall_sample/images/DRain_1871-1880_Cornwall-59.jpg
+</pre></div>
+</div>
+<p>The model downloads on first use (~1 GB) and outputs a JSON rainfall grid.</p>
+</section>
+<section id="visualise-the-extraction-against-ground-truth">
+<h2>3 — Visualise the extraction against ground truth<a class="headerlink" href="#visualise-the-extraction-against-ground-truth" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>visualize<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span>smolvlm<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--ground-truth<span class="w"> </span>Daily_rainfall_sample/transcriptions/DRain_1871-1880_Cornwall-59.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>Daily_rainfall_sample/images/DRain_1871-1880_Cornwall-59.jpg
+</pre></div>
+</div>
+<p>A PNG is saved to <code class="docutils literal notranslate"><span class="pre">outputs/figures/</span></code>.  Numbers are coloured:</p>
+<ul class="simple">
+<li><p><strong>Blue</strong> — matches ground truth</p></li>
+<li><p><strong>Red</strong> — mismatch or missing</p></li>
+</ul>
+</section>
+<section id="evaluate-the-baseline-over-all-paired-images">
+<h2>4 — Evaluate the baseline over all paired images<a class="headerlink" href="#evaluate-the-baseline-over-all-paired-images" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>evaluate<span class="w"> </span>--model<span class="w"> </span>smolvlm
+</pre></div>
+</div>
+<p>Prints per-image and aggregate accuracy statistics.</p>
+</section>
+<section id="fine-tune-on-the-sample-data">
+<h2>5 — Fine-tune on the sample data<a class="headerlink" href="#fine-tune-on-the-sample-data" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>finetune<span class="w"> </span>--model<span class="w"> </span>smolvlm<span class="w"> </span>--epochs<span class="w"> </span><span class="m">3</span>
+</pre></div>
+</div>
+<p>The LoRA adapter is saved to <code class="docutils literal notranslate"><span class="pre">outputs/checkpoints/HuggingFaceTB--SmolVLM-500M-Instruct/</span></code>.</p>
+</section>
+<section id="evaluate-the-fine-tuned-model">
+<h2>6 — Evaluate the fine-tuned model<a class="headerlink" href="#evaluate-the-fine-tuned-model" title="Link to this heading">¶</a></h2>
+<p>Pass the adapter directory as <code class="docutils literal notranslate"><span class="pre">--model</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span>outputs/checkpoints/HuggingFaceTB--SmolVLM-500M-Instruct
+</pre></div>
+</div>
+</section>
+<section id="visualise-fine-tuned-extraction">
+<h2>7 — Visualise fine-tuned extraction<a class="headerlink" href="#visualise-fine-tuned-extraction" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>visualize<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span>outputs/checkpoints/HuggingFaceTB--SmolVLM-500M-Instruct<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>Daily_rainfall_sample/images/DRain_1871-1880_Cornwall-59.jpg
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#inspect-the-sample-data">1 — Inspect the sample data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#extract-a-single-image-baseline-model">2 — Extract a single image (baseline model)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#visualise-the-extraction-against-ground-truth">3 — Visualise the extraction against ground truth</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#evaluate-the-baseline-over-all-paired-images">4 — Evaluate the baseline over all paired images</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fine-tune-on-the-sample-data">5 — Fine-tune on the sample data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#evaluate-the-fine-tuned-model">6 — Evaluate the fine-tuned model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#visualise-fine-tuned-extraction">7 — Visualise fine-tuned extraction</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="guide/ingest.html">Data Ingest</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/extraction.html">Extraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/evaluation.html">Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/visualisation.html">Visualisation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/architecture.html">Architecture</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/quickstart.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="guide/ingest.html" title="Data Ingest"
+             >next</a></li>
+        <li class="right" >
+          <a href="installation.html" title="Installation"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Quick Start</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

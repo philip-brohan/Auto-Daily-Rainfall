@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Extraction &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Fine-tuning" href="finetuning.html" />
+    <link rel="prev" title="Data Ingest" href="ingest.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="finetuning.html" title="Fine-tuning"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="ingest.html" title="Data Ingest"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Extraction</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="extraction">
+<h1>Extraction<a class="headerlink" href="#extraction" title="Link to this heading">¶</a></h1>
+<p>The extraction stage runs a vision-language model over a document image and
+returns a structured JSON rainfall grid.</p>
+<section id="running-extraction">
+<h2>Running extraction<a class="headerlink" href="#running-extraction" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>extract<span class="w"> </span>--model<span class="w"> </span>smolvlm<span class="w"> </span>&lt;image_path&gt;
+</pre></div>
+</div>
+<section id="options">
+<h3>Options<a class="headerlink" href="#options" title="Link to this heading">¶</a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Flag</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--model</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">smolvlm</span></code></p></td>
+<td><p>Model preset or HuggingFace ID</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="example">
+<h3>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>extract<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span>smolvlm<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>Daily_rainfall_sample/images/DRain_1871-1880_Cornwall-59.jpg
+</pre></div>
+</div>
+<p>Output:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;days&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;Day 1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">1.2</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">],</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;totals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">12.4</span><span class="p">,</span><span class="w"> </span><span class="mf">8.1</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="how-extraction-works">
+<h2>How extraction works<a class="headerlink" href="#how-extraction-works" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>The image is loaded and passed to the model along with a prompt asking it
+to return the rainfall data as JSON.</p></li>
+<li><p>The raw text response is parsed with a lenient JSON extractor that strips
+markdown fences and partial responses.</p></li>
+<li><p>If parsing succeeds, a <code class="docutils literal notranslate"><span class="pre">DailyRainfallGrid</span></code> object is returned.  On failure,
+the raw model output is printed to stderr.</p></li>
+</ol>
+</section>
+<section id="using-a-fine-tuned-adapter">
+<h2>Using a fine-tuned adapter<a class="headerlink" href="#using-a-fine-tuned-adapter" title="Link to this heading">¶</a></h2>
+<p>Pass the adapter directory in place of a model name:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>extract<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span>outputs/checkpoints/HuggingFaceTB--SmolVLM-500M-Instruct<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>Daily_rainfall_sample/images/DRain_1871-1880_Cornwall-59.jpg
+</pre></div>
+</div>
+<p>The code detects that the path is a local LoRA adapter (by checking for
+<code class="docutils literal notranslate"><span class="pre">adapter_config.json</span></code>) and loads the base model automatically before applying
+the adapter weights.</p>
+</section>
+<section id="model-presets">
+<h2>Model presets<a class="headerlink" href="#model-presets" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Preset</p></th>
+<th class="head"><p>HuggingFace ID</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">smolvlm</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">HuggingFaceTB/SmolVLM-500M-Instruct</span></code></p></td>
+<td><p>Lightweight baseline</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">granite</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ibm-granite/granite-vision-3.2-2b</span></code></p></td>
+<td><p>IBM Granite Vision 3.2, 2 B</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemma3</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">google/gemma-3-4b-it</span></code></p></td>
+<td><p>Google Gemma 3, 4 B</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemma4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">google/gemma-4-E4B-it</span></code></p></td>
+<td><p>Google Gemma 4, 4 B edge</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ministral</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mistralai/Mistral-Small-3.1-24B-Instruct-2503</span></code></p></td>
+<td><p>Mistral Small 3.1, 24 B; 128 k context</p></td>
+</tr>
+</tbody>
+</table>
+<p>Any full HuggingFace model ID can also be passed directly.
+Gated models (Gemma, Mistral) require a HuggingFace token set via the
+<code class="docutils literal notranslate"><span class="pre">HF_TOKEN</span></code> environment variable or <code class="docutils literal notranslate"><span class="pre">~/.cache/huggingface/token</span></code>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ingest.html">Data Ingest</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Extraction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#running-extraction">Running extraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-extraction-works">How extraction works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#using-a-fine-tuned-adapter">Using a fine-tuned adapter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#model-presets">Model presets</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualisation.html">Visualisation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/guide/extraction.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="finetuning.html" title="Fine-tuning"
+             >next</a></li>
+        <li class="right" >
+          <a href="ingest.html" title="Data Ingest"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Extraction</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

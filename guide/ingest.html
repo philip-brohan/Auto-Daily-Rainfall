@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Data Ingest &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Extraction" href="extraction.html" />
+    <link rel="prev" title="Quick Start" href="../quickstart.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="extraction.html" title="Extraction"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="../quickstart.html" title="Quick Start"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Data Ingest</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="data-ingest">
+<h1>Data Ingest<a class="headerlink" href="#data-ingest" title="Link to this heading">¶</a></h1>
+<p>The ingest stage scans the sample directory and pairs each document image with
+its human transcription, building a dataset of labelled records.</p>
+<section id="directory-layout">
+<h2>Directory layout<a class="headerlink" href="#directory-layout" title="Link to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Daily_rainfall_sample/
+├── images/
+│   ├── DRain_1871-1880_Cornwall-59.jpg
+│   └── ...
+└── transcriptions/
+    ├── DRain_1871-1880_Cornwall-59.json
+    └── ...
+</pre></div>
+</div>
+<p>Images and transcriptions are matched by filename stem.  An image with no
+matching transcription is flagged as <em>unpaired</em> and excluded from fine-tuning
+(but can still be used for inference).</p>
+</section>
+<section id="running-ingest">
+<h2>Running ingest<a class="headerlink" href="#running-ingest" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>ingest
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Scanned</span> <span class="mi">20</span> <span class="n">records</span> <span class="p">(</span><span class="mi">18</span> <span class="n">paired</span><span class="p">,</span> <span class="mi">2</span> <span class="n">unpaired</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="s2">&quot;total&quot;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+  <span class="s2">&quot;paired&quot;</span><span class="p">:</span> <span class="mi">18</span><span class="p">,</span>
+  <span class="s2">&quot;unpaired&quot;</span><span class="p">:</span> <span class="mi">2</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="transcription-format">
+<h2>Transcription format<a class="headerlink" href="#transcription-format" title="Link to this heading">¶</a></h2>
+<p>Each <code class="docutils literal notranslate"><span class="pre">.json</span></code> transcription file is a <code class="docutils literal notranslate"><span class="pre">DailyRainfallGrid</span></code> object:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;days&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;Day 1&quot;</span><span class="p">:</span><span class="w">  </span><span class="p">[</span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3</span><span class="p">,</span><span class="w"> </span><span class="mf">1.1</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;Day 2&quot;</span><span class="p">:</span><span class="w">  </span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span><span class="w">  </span><span class="mf">0.0</span><span class="p">,</span><span class="w">  </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">2.4</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">],</span>
+<span class="w">    </span><span class="err">...</span>
+<span class="w">    </span><span class="nt">&quot;Day 31&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">]</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;totals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">12.4</span><span class="p">,</span><span class="w"> </span><span class="mf">8.1</span><span class="p">,</span><span class="w"> </span><span class="mf">31.2</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Each <code class="docutils literal notranslate"><span class="pre">days</span></code> entry is a list of 12 values (one per month).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">null</span></code> means the day does not exist in that month (e.g. Feb 30) or the cell was blank.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">totals</span></code> is a list of 12 monthly totals.</p></li>
+</ul>
+</section>
+<section id="adding-your-own-data">
+<h2>Adding your own data<a class="headerlink" href="#adding-your-own-data" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Place scanned images in <code class="docutils literal notranslate"><span class="pre">Daily_rainfall_sample/images/</span></code> (or point
+<code class="docutils literal notranslate"><span class="pre">IngestConfig.images_dir</span></code> at your own folder).</p></li>
+<li><p>Create matching <code class="docutils literal notranslate"><span class="pre">.json</span></code> transcriptions for as many images as you have.</p></li>
+<li><p>Re-run <code class="docutils literal notranslate"><span class="pre">weather-extract</span> <span class="pre">ingest</span></code> to pick up the new records.</p></li>
+</ol>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data Ingest</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#directory-layout">Directory layout</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-ingest">Running ingest</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transcription-format">Transcription format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adding-your-own-data">Adding your own data</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="extraction.html">Extraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualisation.html">Visualisation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/guide/ingest.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="extraction.html" title="Extraction"
+             >next</a></li>
+        <li class="right" >
+          <a href="../quickstart.html" title="Quick Start"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Data Ingest</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

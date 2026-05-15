@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Auto Daily Rainfall &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinxdoc.css?v=34905f61" />
+    <script src="_static/documentation_options.js?v=01f34227"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="installation.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="installation.html" title="Installation"
+             accesskey="N">next</a></li>
+        <li class="nav-item nav-item-0"><a href="#">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Auto Daily Rainfall</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="auto-daily-rainfall">
+<h1>Auto Daily Rainfall<a class="headerlink" href="#auto-daily-rainfall" title="Link to this heading">¶</a></h1>
+<p><strong>Automated extraction of daily rainfall data from scanned historical documents
+using small, locally-run vision-language models.</strong></p>
+<hr class="docutils" />
+<section id="what-this-project-does">
+<h2>What this project does<a class="headerlink" href="#what-this-project-does" title="Link to this heading">¶</a></h2>
+<p>Meteorological archives contain millions of handwritten and typed daily rainfall
+registers stretching back over a century.  This project uses small
+<a class="reference external" href="https://huggingface.co/models?pipeline_tag=image-text-to-text">vision-language models (VLMs)</a>
+from Hugging Face to read those document images and output structured JSON — no
+cloud API required.</p>
+<p>The pipeline has three stages:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Scanned document images
+       │
+       ▼
+  1. Ingest          — pair images with human transcriptions
+       │
+       ▼
+  2. Extract         — run a VLM over each image → JSON grid
+       │
+       ▼
+  3. Evaluate / Fine-tune — measure accuracy; improve the model with LoRA
+</pre></div>
+</div>
+</section>
+<section id="sample-document">
+<h2>Sample document<a class="headerlink" href="#sample-document" title="Link to this heading">¶</a></h2>
+<p>The repository ships with a small set of sample images from the
+<code class="docutils literal notranslate"><span class="pre">Daily_rainfall_sample/</span></code> directory.  Each image is a monthly grid of daily
+rainfall totals (mm) for a single UK station:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Column</p></th>
+<th class="head"><p>Contents</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Rows</p></td>
+<td><p>Day 1 – Day 31</p></td>
+</tr>
+<tr class="row-odd"><td><p>Columns</p></td>
+<td><p>Jan – Dec</p></td>
+</tr>
+<tr class="row-even"><td><p>Extra row</p></td>
+<td><p>Monthly totals</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="supported-models">
+<h2>Supported models<a class="headerlink" href="#supported-models" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Short name</p></th>
+<th class="head"><p>HuggingFace ID</p></th>
+<th class="head"><p>Size</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">smolvlm</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">HuggingFaceTB/SmolVLM-500M-Instruct</span></code></p></td>
+<td><p>500 M</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">granite</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ibm-granite/granite-vision-3.2-2b</span></code></p></td>
+<td><p>2 B</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemma3</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">google/gemma-3-4b-it</span></code></p></td>
+<td><p>4 B</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemma4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">google/gemma-4-E4B-it</span></code></p></td>
+<td><p>4 B edge</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ministral</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mistralai/Mistral-Small-3.1-24B-Instruct-2503</span></code></p></td>
+<td><p>24 B</p></td>
+</tr>
+</tbody>
+</table>
+<p>Any HuggingFace model ID can be passed directly with <code class="docutils literal notranslate"><span class="pre">--model</span></code>.
+Gated models (Gemma, Mistral) require a HuggingFace token set via <code class="docutils literal notranslate"><span class="pre">HF_TOKEN</span></code>.</p>
+</section>
+<section id="key-features">
+<h2>Key features<a class="headerlink" href="#key-features" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Runs locally</strong> — models are downloaded once and cached by HuggingFace.</p></li>
+<li><p><strong>LoRA fine-tuning</strong> — improve extraction quality with your own transcribed data in a few hours on a single GPU.</p></li>
+<li><p><strong>Adapter loading</strong> — pass a fine-tuned adapter directory as <code class="docutils literal notranslate"><span class="pre">--model</span></code> and it loads automatically.</p></li>
+<li><p><strong>Diagnostic figures</strong> — side-by-side image / extracted-table visualisation with blue/red cell colouring against ground truth.</p></li>
+</ul>
+</section>
+<section id="quick-links">
+<h2>Quick links<a class="headerlink" href="#quick-links" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="installation.html"><span class="std std-doc">Installation</span></a></p></li>
+<li><p><a class="reference internal" href="quickstart.html"><span class="std std-doc">Quick start</span></a></p></li>
+<li><p><a class="reference internal" href="reference/cli.html"><span class="std std-doc">CLI reference</span></a></p></li>
+</ul>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="#">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/ingest.html">Data Ingest</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/extraction.html">Extraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/evaluation.html">Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/visualisation.html">Visualisation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide/hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/architecture.html">Architecture</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="installation.html" title="Installation"
+             >next</a></li>
+        <li class="nav-item nav-item-0"><a href="#">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Auto Daily Rainfall</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

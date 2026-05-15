@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>HPC and Azure ML &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="CLI Reference" href="../reference/cli.html" />
+    <link rel="prev" title="Visualisation" href="visualisation.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../reference/cli.html" title="CLI Reference"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="visualisation.html" title="Visualisation"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">HPC and Azure ML</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="hpc-and-azure-ml">
+<h1>HPC and Azure ML<a class="headerlink" href="#hpc-and-azure-ml" title="Link to this heading">¶</a></h1>
+<p>This guide covers running the weather document extraction pipeline at scale on
+Microsoft Azure, using Azure ML workspaces for parallel evaluation and
+GPU-accelerated fine-tuning.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>The pipeline has three compute-intensive stages suited to HPC:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Stage</p></th>
+<th class="head"><p>Parallelism</p></th>
+<th class="head"><p>Recommended resource</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">batch-extract</span></code></p></td>
+<td><p>Embarrassingly parallel — each image is independent</p></td>
+<td><p>GPU job array</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">evaluate</span></code></p></td>
+<td><p>Embarrassingly parallel — each image is independent</p></td>
+<td><p>CPU or GPU job array</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">finetune</span></code></p></td>
+<td><p>Single training run on one GPU</p></td>
+<td><p>Single A100 80 GB node</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<hr class="docutils" />
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
+<ol class="arabic">
+<li><p><strong>Azure CLI</strong> with the <strong>ML extension</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>az<span class="w"> </span>extension<span class="w"> </span>add<span class="w"> </span>-n<span class="w"> </span>ml
+az<span class="w"> </span>login
+</pre></div>
+</div>
+</li>
+<li><p><strong>Workspace identifiers</strong> — you need three values:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Where to find it</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Subscription ID</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">az</span> <span class="pre">account</span> <span class="pre">list</span> <span class="pre">--query</span> <span class="pre">&quot;[].{name:name,id:id}&quot;</span> <span class="pre">-o</span> <span class="pre">table</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Resource group</p></td>
+<td><p>Azure ML Studio → workspace overview</p></td>
+</tr>
+<tr class="row-even"><td><p>Workspace name</p></td>
+<td><p>Azure ML Studio → workspace overview</p></td>
+</tr>
+</tbody>
+</table>
+</li>
+<li><p><strong>Compute cluster</strong> — create a GPU cluster in the workspace if you don’t already have one:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>az<span class="w"> </span>ml<span class="w"> </span>compute<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--name<span class="w"> </span>gpu-cluster<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--type<span class="w"> </span>amlcompute<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--min-instances<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--max-instances<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--size<span class="w"> </span>Standard_NC6s_v3<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--workspace-name<span class="w"> </span>&lt;workspace&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--resource-group<span class="w"> </span>&lt;resource-group&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--subscription<span class="w"> </span>&lt;subscription&gt;
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<hr class="docutils" />
+<section id="configuration-file">
+<h2>Configuration file<a class="headerlink" href="#configuration-file" title="Link to this heading">¶</a></h2>
+<p>Copy the template and fill in your values — you only need to do this once:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cp<span class="w"> </span>azureml/config.env.example<span class="w"> </span>azureml/config.env
+</pre></div>
+</div>
+<p>Then edit <code class="docutils literal notranslate"><span class="pre">azureml/config.env</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Workspace coordinates</span>
+<span class="nv">AML_SUBSCRIPTION</span><span class="o">=</span>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+<span class="nv">AML_RESOURCE_GROUP</span><span class="o">=</span>my-resource-group
+<span class="nv">AML_WORKSPACE</span><span class="o">=</span>my-aml-workspace
+
+<span class="c1"># Compute cluster name</span>
+<span class="nv">AML_COMPUTE</span><span class="o">=</span>gpu-cluster
+
+<span class="c1"># Base datastore URI — the default store is created automatically with the workspace</span>
+<span class="nv">AML_DATASTORE_BASE</span><span class="o">=</span>azureml://datastores/workspaceblobstore/paths
+
+<span class="c1"># Input paths (relative to AML_DATASTORE_BASE)</span>
+<span class="nv">AML_IMAGES_PATH</span><span class="o">=</span>Daily_rainfall_sample/images
+<span class="nv">AML_TRANSCRIPTIONS_PATH</span><span class="o">=</span>Daily_rainfall_sample/transcriptions
+
+<span class="c1"># Output root (relative to AML_DATASTORE_BASE)</span>
+<span class="c1"># Jobs write to sub-paths: outputs/extractions, outputs/eval, outputs/checkpoints</span>
+<span class="nv">AML_OUTPUTS_PATH</span><span class="o">=</span>outputs
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">azureml/config.env</span></code> is gitignored so your subscription ID is never committed.
+CLI flags (<code class="docutils literal notranslate"><span class="pre">--subscription</span></code>, <code class="docutils literal notranslate"><span class="pre">--workspace</span></code>, etc.) override any value in the file.</p>
+</section>
+<hr class="docutils" />
+<section id="register-the-azure-ml-environment-once">
+<h2>Register the Azure ML environment (once)<a class="headerlink" href="#register-the-azure-ml-environment-once" title="Link to this heading">¶</a></h2>
+<p>Register the environment before submitting jobs for the first time:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span>env
+</pre></div>
+</div>
+<p>Two environment variants are available; set <code class="docutils literal notranslate"><span class="pre">AML_ENV_VARIANT</span></code> in <code class="docutils literal notranslate"><span class="pre">azureml/config.env</span></code>:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Variant</p></th>
+<th class="head"><p>PyTorch</p></th>
+<th class="head"><p>CUDA</p></th>
+<th class="head"><p>Use case</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">v100</span></code></p></td>
+<td><p>2.4</p></td>
+<td><p>12.1</p></td>
+<td><p>SmolVLM, Granite</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">a100</span></code></p></td>
+<td><p>2.8</p></td>
+<td><p>12.6</p></td>
+<td><p>Gemma 3/4, Ministral (requires <code class="docutils literal notranslate"><span class="pre">torch&gt;=2.6</span></code>)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">azureml/environment-&lt;variant&gt;.yml</span></code> and <code class="docutils literal notranslate"><span class="pre">azureml/conda-&lt;variant&gt;.yml</span></code> to
+change the base image or add dependencies.</p>
+</section>
+<section id="environment-variables">
+<h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading">¶</a></h2>
+<p>All paths and key hyper-parameters can be overridden via environment variables.
+This lets Azure Batch tasks pick up the right mounted storage paths without
+modifying source code.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Variable</p></th>
+<th class="head"><p>Overrides</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_DATA_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">paths.data_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">data</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_OUTPUT_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">paths.outputs_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">outputs</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_MODELS_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">paths.models_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">models</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_IMAGES_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ingest.images_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Daily_rainfall_sample/images</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_TRANSCRIPTIONS_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ingest.transcriptions_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Daily_rainfall_sample/transcriptions</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_INGEST_OUTPUT_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ingest.output_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">data/dataset</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_TRAINING_OUTPUT_DIR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">training.output_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">outputs/checkpoints</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_MODEL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.model_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">HuggingFaceTB/SmolVLM-500M-Instruct</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_DEVICE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">model.device</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">auto</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_EPOCHS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">training.epochs</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_BATCH_SIZE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">training.batch_size</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_GRAD_ACCUM_STEPS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">training.gradient_accumulation_steps</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">8</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_LEARNING_RATE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">training.learning_rate</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.0002</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">WEATHER_REPORT_TO</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">training.report_to</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">none</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code></p></td>
+<td><p>HuggingFace model cache</p></td>
+<td><p>(HuggingFace default)</p></td>
+</tr>
+</tbody>
+</table>
+<p>These are read at <code class="docutils literal notranslate"><span class="pre">AppConfig</span></code> construction time, so they apply to every CLI
+command without any extra flags.  In Azure ML jobs they are set via the
+<code class="docutils literal notranslate"><span class="pre">environment_variables</span></code> section of the job YAML and can be overridden per
+submission with <code class="docutils literal notranslate"><span class="pre">--set</span> <span class="pre">environment_variables.VAR=value</span></code>.</p>
+</section>
+<hr class="docutils" />
+<section id="data-paths-and-outputs">
+<h2>Data paths and outputs<a class="headerlink" href="#data-paths-and-outputs" title="Link to this heading">¶</a></h2>
+<p>Each job YAML in <code class="docutils literal notranslate"><span class="pre">azureml/</span></code> declares typed <code class="docutils literal notranslate"><span class="pre">inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">outputs</span></code>:</p>
+<ul>
+<li><p><strong>Inputs</strong> (<code class="docutils literal notranslate"><span class="pre">type:</span> <span class="pre">uri_folder</span></code>, <code class="docutils literal notranslate"><span class="pre">mode:</span> <span class="pre">ro_mount</span></code>) — Azure ML mounts your
+datastore paths read-only on the compute node.  The default paths point at
+<code class="docutils literal notranslate"><span class="pre">workspaceblobstore</span></code> (the storage account that every workspace creates
+automatically).  Override them with <code class="docutils literal notranslate"><span class="pre">--set</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>az<span class="w"> </span>ml<span class="w"> </span>job<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>azureml/extract_job.yml<span class="w"> </span>...<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--set<span class="w"> </span>inputs.images_dir.path<span class="o">=</span><span class="s2">&quot;azureml://datastores/mystore/paths/images&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Outputs</strong> (<code class="docutils literal notranslate"><span class="pre">type:</span> <span class="pre">uri_folder</span></code>, <code class="docutils literal notranslate"><span class="pre">mode:</span> <span class="pre">rw_mount</span></code>) — Azure ML mounts a
+writable directory backed by <code class="docutils literal notranslate"><span class="pre">workspaceblobstore</span></code>.  When the job finishes,
+the files are <strong>automatically uploaded and persisted</strong>.  You can access them
+via:</p>
+<ul class="simple">
+<li><p><strong>Studio UI</strong>: job → <strong>Outputs + logs</strong> tab</p></li>
+<li><p><strong>Azure CLI</strong>: <code class="docutils literal notranslate"><span class="pre">az</span> <span class="pre">ml</span> <span class="pre">job</span> <span class="pre">download</span> <span class="pre">--name</span> <span class="pre">&lt;job-id&gt;</span> <span class="pre">--output-name</span> <span class="pre">&lt;name&gt;</span> <span class="pre">-w</span> <span class="pre">&lt;ws&gt;</span> <span class="pre">-g</span> <span class="pre">&lt;rg&gt;</span></code></p></li>
+<li><p>As inputs to a subsequent job</p></li>
+</ul>
+</li>
+</ul>
+<p>So you don’t need to configure blobfuse2 or worry about ephemeral compute disk
+— results are safely stored in the workspace datastore automatically.</p>
+<section id="changing-the-datastore">
+<h3>Changing the datastore<a class="headerlink" href="#changing-the-datastore" title="Link to this heading">¶</a></h3>
+<p>The default <code class="docutils literal notranslate"><span class="pre">workspaceblobstore</span></code> is created automatically with every workspace.
+To use a different registered datastore:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>--set<span class="w"> </span>inputs.images_dir.path<span class="o">=</span><span class="s2">&quot;azureml://datastores/&lt;datastore-name&gt;/paths/&lt;path&gt;&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="mounting-via-blobfuse2-advanced">
+<h3>Mounting via blobfuse2 (advanced)<a class="headerlink" href="#mounting-via-blobfuse2-advanced" title="Link to this heading">¶</a></h3>
+<p>If you need to access data that is not in a registered datastore, you can mount
+a Blob Storage container directly using blobfuse2 and pass the mount path as
+an environment variable override.  See the
+<a class="reference external" href="https://github.com/Azure/azure-storage-fuse">blobfuse2 documentation</a> for
+installation and mount instructions.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="bulk-extraction-with-job-arrays">
+<h2>Bulk extraction with job arrays<a class="headerlink" href="#bulk-extraction-with-job-arrays" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">batch-extract</span></code> runs the model over every image in <code class="docutils literal notranslate"><span class="pre">WEATHER_IMAGES_DIR</span></code> and
+writes one <code class="docutils literal notranslate"><span class="pre">&lt;stem&gt;.json</span></code> per image to an output directory.  Ground-truth
+transcriptions are <strong>not</strong> required — this is the right command when you want
+to extract data from new, unannotated images.</p>
+<section id="output-format">
+<h3>Output format<a class="headerlink" href="#output-format" title="Link to this heading">¶</a></h3>
+<p>Each file contains:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;stem&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DRain_1871-1880_Cornwall-59&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;parse_failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;grid&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;days&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Day 1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.12</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">],</span><span class="w"> </span><span class="err">...</span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;totals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>If the model response could not be parsed, <code class="docutils literal notranslate"><span class="pre">parse_failed</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code> and a
+<code class="docutils literal notranslate"><span class="pre">raw_text</span></code> field contains the raw model output for debugging.</p>
+</section>
+<section id="local-test">
+<h3>Local test<a class="headerlink" href="#local-test" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>weather-extract<span class="w"> </span>batch-extract<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--model<span class="w"> </span>smolvlm<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output-dir<span class="w"> </span>outputs/extractions
+</pre></div>
+</div>
+</section>
+<section id="sharded-job-array-azure-ml">
+<h3>Sharded job array (Azure ML)<a class="headerlink" href="#sharded-job-array-azure-ml" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">scripts/aml_submit.sh</span></code> — it reads workspace coordinates and paths from
+<code class="docutils literal notranslate"><span class="pre">azureml/config.env</span></code> automatically:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span>--total-shards<span class="w"> </span><span class="m">8</span><span class="w"> </span>extract
+</pre></div>
+</div>
+<p>The script prints the resolved workspace, compute, and data paths before
+submitting so you can verify them.  Override any value on the command line:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span>--total-shards<span class="w"> </span><span class="m">8</span><span class="w"> </span>--compute<span class="w"> </span>big-gpu-cluster<span class="w"> </span>extract
+</pre></div>
+</div>
+</section>
+<section id="collecting-results">
+<h3>Collecting results<a class="headerlink" href="#collecting-results" title="Link to this heading">¶</a></h3>
+<p>After all tasks finish, the output directory contains one JSON per image.
+Load them all:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span><span class="o">,</span><span class="w"> </span><span class="nn">pathlib</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;outputs/extractions&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.json&quot;</span><span class="p">))</span>
+<span class="p">]</span>
+<span class="n">succeeded</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">r</span><span class="p">[</span><span class="s2">&quot;parse_failed&quot;</span><span class="p">]]</span>
+<span class="n">failed</span>    <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s2">&quot;parse_failed&quot;</span><span class="p">]]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extracted: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">succeeded</span><span class="p">)</span><span class="si">}</span><span class="s2">  Failed: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">failed</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="parallel-evaluation-with-job-arrays">
+<h2>Parallel evaluation with job arrays<a class="headerlink" href="#parallel-evaluation-with-job-arrays" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">evaluate</span></code> command accepts <code class="docutils literal notranslate"><span class="pre">--shard</span> <span class="pre">N</span> <span class="pre">--total-shards</span> <span class="pre">M</span></code> to process the
+<code class="docutils literal notranslate"><span class="pre">N</span></code>-th of <code class="docutils literal notranslate"><span class="pre">M</span></code> equal-sized slices of the paired records.  This maps directly
+to an Azure Batch job array where each task sets <code class="docutils literal notranslate"><span class="pre">--shard</span></code> to its (1-based)
+task index.</p>
+<section id="id1">
+<h3>Local test<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Split 100 records across 4 shards — run locally to verify</span>
+weather-extract<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--shard<span class="w"> </span><span class="m">1</span><span class="w"> </span>--total-shards<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output-file<span class="w"> </span>outputs/eval/shard_1_of_4.json
+</pre></div>
+</div>
+</section>
+<section id="submit-a-job-array-azure-ml">
+<h3>Submit a job array (Azure ML)<a class="headerlink" href="#submit-a-job-array-azure-ml" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span>--total-shards<span class="w"> </span><span class="m">8</span><span class="w"> </span>evaluate
+</pre></div>
+</div>
+</section>
+<section id="aggregating-shard-results">
+<h3>Aggregating shard results<a class="headerlink" href="#aggregating-shard-results" title="Link to this heading">¶</a></h3>
+<p>Each shard writes a JSON file containing its <code class="docutils literal notranslate"><span class="pre">summary</span></code> and <code class="docutils literal notranslate"><span class="pre">comparisons</span></code>.
+Combine them with a simple script:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span><span class="o">,</span><span class="w"> </span><span class="nn">pathlib</span><span class="o">,</span><span class="w"> </span><span class="nn">statistics</span>
+
+<span class="n">shards</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;outputs/eval&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;shard_*.json&quot;</span><span class="p">)]</span>
+<span class="n">all_comparisons</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">shards</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">s</span><span class="p">[</span><span class="s2">&quot;comparisons&quot;</span><span class="p">]]</span>
+
+<span class="n">accuracies</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="p">[</span><span class="s2">&quot;accuracy&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_comparisons</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">c</span><span class="p">[</span><span class="s2">&quot;parse_failed&quot;</span><span class="p">]]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Images evaluated: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">all_comparisons</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Macro accuracy:   </span><span class="si">{</span><span class="n">statistics</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">accuracies</span><span class="p">)</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="fine-tuning-on-a-gpu-node">
+<h2>Fine-tuning on a GPU node<a class="headerlink" href="#fine-tuning-on-a-gpu-node" title="Link to this heading">¶</a></h2>
+<section id="submit-the-fine-tuning-job-azure-ml">
+<h3>Submit the fine-tuning job (Azure ML)<a class="headerlink" href="#submit-the-fine-tuning-job-azure-ml" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span>finetune
+</pre></div>
+</div>
+<p>Override training hyper-parameters with <code class="docutils literal notranslate"><span class="pre">--set</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>az<span class="w"> </span>ml<span class="w"> </span>job<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--file<span class="w"> </span>azureml/finetune_job.yml<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--workspace-name<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AML_WORKSPACE</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--resource-group<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AML_RESOURCE_GROUP</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--subscription<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AML_SUBSCRIPTION</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--set<span class="w"> </span>environment_variables.WEATHER_EPOCHS<span class="o">=</span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--set<span class="w"> </span>environment_variables.WEATHER_REPORT_TO<span class="o">=</span>wandb
+</pre></div>
+</div>
+<p>Edit <code class="docutils literal notranslate"><span class="pre">azureml/finetune_job.yml</span></code> to choose your compute cluster name and data
+paths.  The default command is a plain <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">weather_doc_extractor.cli</span> <span class="pre">finetune</span></code>
+(single GPU — no Accelerate launcher required).</p>
+</section>
+<section id="local-single-gpu-run">
+<h3>Local / single-GPU run<a class="headerlink" href="#local-single-gpu-run" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">WEATHER_IMAGES_DIR</span><span class="o">=</span>Daily_rainfall_sample/images
+<span class="nb">export</span><span class="w"> </span><span class="nv">WEATHER_TRANSCRIPTIONS_DIR</span><span class="o">=</span>Daily_rainfall_sample/transcriptions
+<span class="nb">export</span><span class="w"> </span><span class="nv">WEATHER_TRAINING_OUTPUT_DIR</span><span class="o">=</span>outputs/checkpoints
+<span class="nb">export</span><span class="w"> </span><span class="nv">HF_TOKEN</span><span class="o">=</span>&lt;your-token&gt;<span class="w">   </span><span class="c1"># required for Gemma/Ministral</span>
+
+weather-extract<span class="w"> </span>finetune<span class="w"> </span>--model<span class="w"> </span>smolvlm<span class="w"> </span>--epochs<span class="w"> </span><span class="m">5</span>
+</pre></div>
+</div>
+</section>
+<section id="recommended-azure-vm-skus">
+<h3>Recommended Azure VM SKUs<a class="headerlink" href="#recommended-azure-vm-skus" title="Link to this heading">¶</a></h3>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>SKU</p></th>
+<th class="head"><p>GPUs</p></th>
+<th class="head"><p>Use case</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Standard_NC6s_v3</span></code></p></td>
+<td><p>1× V100 16 GB</p></td>
+<td><p>SmolVLM / Granite development runs</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Standard_NC96ads_A100_v4</span></code></p></td>
+<td><p>4× A100 80 GB</p></td>
+<td><p>Gemma / Ministral; use single GPU per job</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Standard_ND96asr_v4</span></code></p></td>
+<td><p>8× A100 40 GB</p></td>
+<td><p>Largest scale</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<hr class="docutils" />
+<section id="node-setup-azure-batch">
+<h2>Node setup (Azure Batch)<a class="headerlink" href="#node-setup-azure-batch" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">scripts/setup_env.sh</span></code> installs the Conda environment on a fresh Azure Batch node.
+Call it as the pool start task or at the top of each job script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/setup_env.sh
+</pre></div>
+</div>
+<p>It reads <code class="docutils literal notranslate"><span class="pre">CONDA_HOME</span></code>, <code class="docutils literal notranslate"><span class="pre">REPO_DIR</span></code>, <code class="docutils literal notranslate"><span class="pre">CONDA_ENV_NAME</span></code>, and <code class="docutils literal notranslate"><span class="pre">HF_HOME</span></code> from the
+environment, with sensible defaults.  This is not needed for Azure ML jobs —
+the environment is managed by the <code class="docutils literal notranslate"><span class="pre">azureml/environment.yml</span></code> definition.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ingest.html">Data Ingest</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extraction.html">Extraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualisation.html">Visualisation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">HPC and Azure ML</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuration-file">Configuration file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#register-the-azure-ml-environment-once">Register the Azure ML environment (once)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#data-paths-and-outputs">Data paths and outputs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bulk-extraction-with-job-arrays">Bulk extraction with job arrays</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#parallel-evaluation-with-job-arrays">Parallel evaluation with job arrays</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fine-tuning-on-a-gpu-node">Fine-tuning on a GPU node</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#node-setup-azure-batch">Node setup (Azure Batch)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/guide/hpc-azure.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../reference/cli.html" title="CLI Reference"
+             >next</a></li>
+        <li class="right" >
+          <a href="visualisation.html" title="Visualisation"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">HPC and Azure ML</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>
