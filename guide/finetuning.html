@@ -124,8 +124,9 @@ default).</p></li>
 <li><p>Start with <code class="docutils literal notranslate"><span class="pre">--lora-r</span> <span class="pre">8</span></code> (the default).  Increase to <code class="docutils literal notranslate"><span class="pre">16</span></code> or <code class="docutils literal notranslate"><span class="pre">32</span></code> if the
 model underfits.</p></li>
 <li><p>Use <code class="docutils literal notranslate"><span class="pre">--eval-split</span> <span class="pre">0.15</span></code> to monitor validation loss and catch overfitting.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">smolvlm</span></code> (500 M) trains in minutes on a modern GPU; <code class="docutils literal notranslate"><span class="pre">granite</span></code> (2 B) and
-<code class="docutils literal notranslate"><span class="pre">gemma3</span></code> / <code class="docutils literal notranslate"><span class="pre">gemma4</span></code> (4 B) take longer but tend to generalise better.
+<li><p><code class="docutils literal notranslate"><span class="pre">smolvlm</span></code> (500 M) trains in minutes on a modern GPU; <code class="docutils literal notranslate"><span class="pre">smolvlm2</span></code> (2.2 B),
+<code class="docutils literal notranslate"><span class="pre">granite</span></code> (2 B), <code class="docutils literal notranslate"><span class="pre">granite4</span></code> (4 B), and <code class="docutils literal notranslate"><span class="pre">gemma3</span></code> / <code class="docutils literal notranslate"><span class="pre">gemma4</span></code> (4 B) take longer
+but tend to generalise better.
 <code class="docutils literal notranslate"><span class="pre">ministral</span></code> (24 B) requires a large GPU (A100 80 GB or equivalent).</p></li>
 <li><p>Gated models (<code class="docutils literal notranslate"><span class="pre">gemma3</span></code>, <code class="docutils literal notranslate"><span class="pre">gemma4</span></code>, <code class="docutils literal notranslate"><span class="pre">ministral</span></code>) require a HuggingFace token —
 set <code class="docutils literal notranslate"><span class="pre">HF_TOKEN</span></code> in your environment before launching.</p></li>

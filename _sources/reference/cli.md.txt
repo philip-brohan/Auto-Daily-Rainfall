@@ -48,7 +48,7 @@ weather-extract extract [--model <name|id|path>] <image_path>
 
 | Flag | Description |
 |------|-------------|
-| `--model` | Model preset (`smolvlm`, `granite`), HuggingFace ID, or local adapter path |
+| `--model` | Model preset (`smolvlm`, `smolvlm2`, `granite`, `granite4`), HuggingFace ID, or local adapter path |
 
 ---
 
@@ -109,7 +109,9 @@ weather-extract visualize [--model <name>] [--output PATH] \
 | Preset | HuggingFace ID |
 |--------|---------------|
 | `smolvlm` | `HuggingFaceTB/SmolVLM-500M-Instruct` |
+| `smolvlm2` | `HuggingFaceTB/SmolVLM2-2.2B-Instruct` |
 | `granite` | `ibm-granite/granite-vision-3.2-2b` |
+| `granite4` | `ibm-granite/granite-vision-4.1-4b` |
 
 Any full HuggingFace model ID or a local adapter directory can be passed to
 `--model` in place of a preset name.

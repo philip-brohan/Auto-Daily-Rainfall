@@ -38,7 +38,9 @@ model IDs or local adapter paths.
 | Preset | Model ID | Notes |
 |--------|----------|-------|
 | `smolvlm` | `HuggingFaceTB/SmolVLM-500M-Instruct` | Lightweight baseline (~500 M params) |
+| `smolvlm2` | `HuggingFaceTB/SmolVLM2-2.2B-Instruct` | SmolVLM2, 2.2 B |
 | `granite` | `ibm-granite/granite-vision-3.2-2b` | IBM Granite Vision 3.2, 2 B |
+| `granite4` | `ibm-granite/granite-vision-4.1-4b` | IBM Granite Vision 4.1, 4 B |
 | `gemma3` | `google/gemma-3-4b-it` | Google Gemma 3, 4 B; uses pan-and-scan tiling for high-res scans |
 | `gemma4` | `google/gemma-4-E4B-it` | Google Gemma 4, 4 B edge; variable-resolution token budget |
 | `ministral` | `mistralai/Mistral-Small-3.1-24B-Instruct-2503` | Mistral Small 3.1, 24 B; Pixtral vision encoder, 128 k context |

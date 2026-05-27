@@ -45,7 +45,9 @@ rainfall totals (mm) for a single UK station:
 | Short name  | HuggingFace ID | Size |
 |-------------|----------------|------|
 | `smolvlm`   | `HuggingFaceTB/SmolVLM-500M-Instruct` | 500 M |
+| `smolvlm2`  | `HuggingFaceTB/SmolVLM2-2.2B-Instruct` | 2.2 B |
 | `granite`   | `ibm-granite/granite-vision-3.2-2b` | 2 B |
+| `granite4`  | `ibm-granite/granite-vision-4.1-4b` | 4 B |
 | `gemma3`    | `google/gemma-3-4b-it` | 4 B |
 | `gemma4`    | `google/gemma-4-E4B-it` | 4 B edge |
 | `ministral` | `mistralai/Mistral-Small-3.1-24B-Instruct-2503` | 24 B |

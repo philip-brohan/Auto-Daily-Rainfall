@@ -43,10 +43,10 @@ inference.py                            finetune.py
 
 ### Model-agnostic inference
 
-`inference.py` detects the model family (`smolvlm` or `granite`) from the model
-name and applies the appropriate chat template and image tokenisation.  New
-model families can be added by extending `detect_model_family()` and the
-collate function in `finetune.py`.
+`inference.py` detects the model family (`smolvlm`, `smolvlm2`, `granite`,
+`granite4`, etc.) from the model name and applies the appropriate chat template
+and image tokenisation.  New model families can be added by extending
+`detect_model_family()` and the collate function in `finetune.py`.
 
 ### LoRA adapter detection
 

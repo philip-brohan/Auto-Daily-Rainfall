@@ -456,6 +456,29 @@ weather-extract<span class="w"> </span>finetune<span class="w"> </span>--model<s
 </section>
 </section>
 <hr class="docutils" />
+<section id="granite4-validation-gate-azure">
+<h2>Granite4 validation gate (Azure)<a class="headerlink" href="#granite4-validation-gate-azure" title="Link to this heading">¶</a></h2>
+<p>When local testing is constrained by RAM or missing GPUs, run the Granite 4.1
+validation gate in Azure before merging model-related changes.</p>
+<p>This gate submits both required jobs:</p>
+<ol class="arabic simple">
+<li><p>Granite4 extraction smoke test</p></li>
+<li><p>Granite4 fine-tuning smoke test</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/azure_validate_granite4.sh<span class="w"> </span>--limit<span class="w"> </span><span class="m">2</span><span class="w"> </span>--env-variant<span class="w"> </span>a100
+</pre></div>
+</div>
+<p>The helper script wraps <code class="docutils literal notranslate"><span class="pre">scripts/aml_submit.sh</span></code> and enforces <code class="docutils literal notranslate"><span class="pre">--model</span> <span class="pre">granite4</span></code>
+for both submissions.</p>
+<p>Required checks after submission:</p>
+<ol class="arabic simple">
+<li><p>Extraction job completes and produces parseable JSON output.</p></li>
+<li><p>Fine-tune job completes and writes adapter checkpoints.</p></li>
+<li><p>Post-finetune extraction succeeds when the adapter path is passed to <code class="docutils literal notranslate"><span class="pre">--model</span></code>.</p></li>
+<li><p>One regression extraction with <code class="docutils literal notranslate"><span class="pre">--model</span> <span class="pre">granite</span></code> still succeeds (3.2 compatibility).</p></li>
+</ol>
+</section>
+<hr class="docutils" />
 <section id="node-setup-azure-batch">
 <h2>Node setup (Azure Batch)<a class="headerlink" href="#node-setup-azure-batch" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">scripts/setup_env.sh</span></code> installs the Conda environment on a fresh Azure Batch node.
@@ -495,6 +518,7 @@ the environment is managed by the <code class="docutils literal notranslate"><sp
 <li class="toctree-l2"><a class="reference internal" href="#bulk-extraction-with-job-arrays">Bulk extraction with job arrays</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#parallel-evaluation-with-job-arrays">Parallel evaluation with job arrays</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#fine-tuning-on-a-gpu-node">Fine-tuning on a GPU node</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#granite4-validation-gate-azure">Granite4 validation gate (Azure)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#node-setup-azure-batch">Node setup (Azure Batch)</a></li>
 </ul>
 </li>

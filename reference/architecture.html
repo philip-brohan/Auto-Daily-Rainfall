@@ -75,10 +75,10 @@ inference.py                            finetune.py
 <h2>Key design decisions<a class="headerlink" href="#key-design-decisions" title="Link to this heading">¶</a></h2>
 <section id="model-agnostic-inference">
 <h3>Model-agnostic inference<a class="headerlink" href="#model-agnostic-inference" title="Link to this heading">¶</a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">inference.py</span></code> detects the model family (<code class="docutils literal notranslate"><span class="pre">smolvlm</span></code> or <code class="docutils literal notranslate"><span class="pre">granite</span></code>) from the model
-name and applies the appropriate chat template and image tokenisation.  New
-model families can be added by extending <code class="docutils literal notranslate"><span class="pre">detect_model_family()</span></code> and the
-collate function in <code class="docutils literal notranslate"><span class="pre">finetune.py</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">inference.py</span></code> detects the model family (<code class="docutils literal notranslate"><span class="pre">smolvlm</span></code>, <code class="docutils literal notranslate"><span class="pre">smolvlm2</span></code>, <code class="docutils literal notranslate"><span class="pre">granite</span></code>,
+<code class="docutils literal notranslate"><span class="pre">granite4</span></code>, etc.) from the model name and applies the appropriate chat template
+and image tokenisation.  New model families can be added by extending
+<code class="docutils literal notranslate"><span class="pre">detect_model_family()</span></code> and the collate function in <code class="docutils literal notranslate"><span class="pre">finetune.py</span></code>.</p>
 </section>
 <section id="lora-adapter-detection">
 <h3>LoRA adapter detection<a class="headerlink" href="#lora-adapter-detection" title="Link to this heading">¶</a></h3>

@@ -331,6 +331,32 @@ weather-extract finetune --model smolvlm --epochs 5
 
 ---
 
+## Granite4 validation gate (Azure)
+
+When local testing is constrained by RAM or missing GPUs, run the Granite 4.1
+validation gate in Azure before merging model-related changes.
+
+This gate submits both required jobs:
+
+1. Granite4 extraction smoke test
+2. Granite4 fine-tuning smoke test
+
+```bash
+bash scripts/azure_validate_granite4.sh --limit 2 --env-variant a100
+```
+
+The helper script wraps `scripts/aml_submit.sh` and enforces `--model granite4`
+for both submissions.
+
+Required checks after submission:
+
+1. Extraction job completes and produces parseable JSON output.
+2. Fine-tune job completes and writes adapter checkpoints.
+3. Post-finetune extraction succeeds when the adapter path is passed to `--model`.
+4. One regression extraction with `--model granite` still succeeds (3.2 compatibility).
+
+---
+
 ## Node setup (Azure Batch)
 
 `scripts/setup_env.sh` installs the Conda environment on a fresh Azure Batch node.
