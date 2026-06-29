@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Lab Notebook Template &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Lab Notebook Template</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="lab-notebook-template">
+<h1>Lab Notebook Template<a class="headerlink" href="#lab-notebook-template" title="Link to this heading">¶</a></h1>
+<p>Use this as the human-readable companion to any run of extraction, validation, or fine-tuning.
+Keep the notebook file in the top-level <code class="docutils literal notranslate"><span class="pre">notebooks/</span></code> directory, not in <code class="docutils literal notranslate"><span class="pre">logs/</span></code>.</p>
+<section id="purpose">
+<h2>Purpose<a class="headerlink" href="#purpose" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Record the exact commands used to produce a model or output.</p></li>
+<li><p>Keep the sequence readable and copy/paste friendly.</p></li>
+<li><p>Capture the context that matters later: checkpoint path, dataset path, job id, and any deviations.</p></li>
+</ul>
+</section>
+<section id="suggested-workflow">
+<h2>Suggested workflow<a class="headerlink" href="#suggested-workflow" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Write a short session header with date, run label, and git commit.</p></li>
+<li><p>Copy one command block into a terminal and run it.</p></li>
+<li><p>Paste the result into the notebook or append a short note.</p></li>
+<li><p>Record the job id, output path, and any observations.</p></li>
+<li><p>Repeat for the next step.</p></li>
+</ol>
+</section>
+<section id="template-structure">
+<h2>Template structure<a class="headerlink" href="#template-structure" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Session setup</p></li>
+<li><p>Inputs and fixed paths</p></li>
+<li><p>Command blocks</p></li>
+<li><p>Observations</p></li>
+<li><p>Results and next steps</p></li>
+</ul>
+</section>
+<section id="four-examples">
+<h2>Four examples<a class="headerlink" href="#four-examples" title="Link to this heading">¶</a></h2>
+<section id="extraction-run">
+<h3>1. Extraction run<a class="headerlink" href="#extraction-run" title="Link to this heading">¶</a></h3>
+<p>Use this when you are generating model outputs from a checkpoint.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--checkpoint<span class="w"> </span>Daily_rainfall_sample/outputs/checkpoints/&lt;run&gt;/&lt;checkpoint&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--images-path<span class="w"> </span>documents/DailyRainfall_UK/consensus_1000/images<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--transcriptions-path<span class="w"> </span>documents/DailyRainfall_UK/consensus_1000/transcriptions_2<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--total-shards<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--batch-size<span class="w"> </span><span class="m">50</span><span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--extraction-registry<span class="w"> </span>outputs/extraction_registry.json<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>extract
+</pre></div>
+</div>
+<p>Record:</p>
+<ul class="simple">
+<li><p>checkpoint used</p></li>
+<li><p>job id(s)</p></li>
+<li><p>output registry entry</p></li>
+<li><p>any shard or batch-size changes</p></li>
+</ul>
+</section>
+<section id="standard-fine-tune">
+<h3>2. Standard fine-tune<a class="headerlink" href="#standard-fine-tune" title="Link to this heading">¶</a></h3>
+<p>Use this for a fresh LoRA fine-tune starting from the base model.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--model<span class="w"> </span>granite4<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--images-path<span class="w"> </span>Daily_rainfall_sample/images<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--transcriptions-path<span class="w"> </span>Daily_rainfall_sample/transcriptions<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>finetune
+</pre></div>
+</div>
+<p>Record:</p>
+<ul class="simple">
+<li><p>selected model preset or model id</p></li>
+<li><p>dataset paths</p></li>
+<li><p>checkpoint output location</p></li>
+<li><p>job id</p></li>
+</ul>
+</section>
+<section id="consensus-fine-tune">
+<h3>3. Consensus fine-tune<a class="headerlink" href="#consensus-fine-tune" title="Link to this heading">¶</a></h3>
+<p>Use this when training on strict consensus transcriptions.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--model<span class="w"> </span>Daily_rainfall_sample/outputs/checkpoints/&lt;run&gt;/&lt;checkpoint&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--images-path<span class="w"> </span>documents/DailyRainfall_UK/consensus_1000/images<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--consensus-transcriptions-path<span class="w"> </span>documents/DailyRainfall_UK/consensus_1000/transcriptions<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>finetune-consensus
+</pre></div>
+</div>
+<p>Record:</p>
+<ul class="simple">
+<li><p>input checkpoint path</p></li>
+<li><p>consensus transcription path</p></li>
+<li><p>model family</p></li>
+<li><p>output checkpoint path</p></li>
+<li><p>job id</p></li>
+</ul>
+</section>
+<section id="evaluation-or-validation-run">
+<h3>4. Evaluation or validation run<a class="headerlink" href="#evaluation-or-validation-run" title="Link to this heading">¶</a></h3>
+<p>Use this after extraction to measure output quality or generate figures.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>scripts/aml_submit.sh<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--dataset<span class="w"> </span>test_real<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--checkpoint<span class="w"> </span>Daily_rainfall_sample/outputs/checkpoints/&lt;run&gt;/&lt;checkpoint&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--limit<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>--total-shards<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">	</span>extract
+</pre></div>
+</div>
+<p>Record:</p>
+<ul class="simple">
+<li><p>evaluation dataset name</p></li>
+<li><p>checkpoint under test</p></li>
+<li><p>limits or shard counts</p></li>
+<li><p>result path or report path</p></li>
+</ul>
+</section>
+</section>
+<section id="what-to-record-for-each-command">
+<h2>What to record for each command<a class="headerlink" href="#what-to-record-for-each-command" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Timestamp in UTC</p></li>
+<li><p>Command exactly as run</p></li>
+<li><p>Input checkpoint or dataset paths</p></li>
+<li><p>Output path or job id</p></li>
+<li><p>Whether it completed successfully</p></li>
+<li><p>Any warnings or unexpected behavior</p></li>
+</ul>
+</section>
+<section id="recommended-notebook-naming">
+<h2>Recommended notebook naming<a class="headerlink" href="#recommended-notebook-naming" title="Link to this heading">¶</a></h2>
+<p>Use a name that includes the run date and task, for example:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">notebooks/2026-06-12-consensus-round2.ipynb</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">notebooks/2026-06-12-granite-consensus-validation.ipynb</span></code></p></li>
+</ul>
+</section>
+<section id="minimal-entry-format">
+<h2>Minimal entry format<a class="headerlink" href="#minimal-entry-format" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>2026-06-12T12:34:56Z | consensus-round2 | submit extraction for granite4 | job=... | ok
+</pre></div>
+</div>
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Keep the notebook linear and short.</p></li>
+<li><p>If you rerun a step, record both the failed attempt and the fix.</p></li>
+<li><p>Use the runbook to preserve the narrative; use the notebook to preserve the exact commands and outcomes.</p></li>
+</ul>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/ingest.html">Data Ingest</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/extraction.html">Extraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/finetuning.html">Fine-tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/evaluation.html">Evaluation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/visualisation.html">Visualisation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../guide/hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/runbooks/lab-notebook-template.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Lab Notebook Template</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>
