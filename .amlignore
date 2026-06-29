@@ -4,7 +4,11 @@
 # Sample / local data (lives on the datastore, not in the snapshot)
 Daily_rainfall_sample/
 outputs/
-fake_daily_rainfall
+fake_daily_rainfall/
+fake_daily_rainfall_2/
+consensus_data/
+test_data/
+logs/
 
 # Documentation
 docs/
@@ -23,3 +27,12 @@ azureml/config.env
 # Dev tooling
 .github/
 .git/
+.vscode/
+
+# Python/local caches
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.coverage
+.DS_Store

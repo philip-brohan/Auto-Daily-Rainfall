@@ -3,77 +3,148 @@ description: 'Instructions for building AI pipelines to extract weather data fro
 applyTo: '**'
 ---
 
-# Compute Resources
+# Project Scope
 
-This computer has limited capability (6Gb RAM, no GPU), so the main modelling tasks are designed to run on Azure ML with GPU acceleration for training and inference. Use the local machine for data preparation, validation, orchestration, and code changes only.
+This repository extracts daily rainfall tables from historical document images.
 
-Do not assume local caches or local artifacts persist between Azure jobs. Anything that must survive runs should live on the Azure datastore.
+- Scale: about 660,000 JPEG images.
+- Unit of data: one station-year table per image.
+- Target output: station metadata plus daily and monthly precipitation values.
+
+The workflow is multi-model and staged:
+
+1. Initial fine-tuning on synthetic data with known truth.
+2. Multi-model extraction on real samples.
+3. Consensus dataset creation from model agreement.
+4. Second-round fine-tuning on high-confidence consensus samples.
+5. Full-dataset extraction with the updated models.
+
+# Compute and Persistence
+
+- Local machine: low-resource (6 GB RAM, no GPU). Use it for code changes, orchestration, and validation only.
+- Azure ML: primary execution target for extraction, evaluation, and fine-tuning.
+- Any artifact that must persist between jobs must live on Azure datastore paths.
+- Do not rely on local ephemeral caches from Azure runs.
 
 # Environments
 
-All work is done in a Conda environment. Environment definitions live in the `azureml/` directory. There may be multiple environment files for different Azure ML compute targets, for example `conda.yml` for V100 and `conda-a100.yml` for A100.
+- Local environment: weather-doc-extractor from environment.yml.
+- Azure environments: files in azureml/ (for example conda.yml and conda-a100.yml).
+- Environment registration script: scripts/azure_register_environments.sh.
 
-When changing model support or dependencies:
-- update the relevant Azure ML environment YAML files,
-- re-register the environment if needed,
-- keep the local `environment.yml` consistent with the Azure environments where applicable.
+When dependencies or model support change:
 
-# Azure Workflow
+1. Update the relevant Azure ML environment YAML file(s).
+2. Re-register environments if needed.
+3. Keep local environment.yml aligned where applicable.
 
-Azure ML is the execution target for extraction, evaluation, and fine-tuning.
+## MANDATORY: Script Execution Environment
 
-Use the repository scripts rather than ad hoc commands:
-- `scripts/aml_submit.sh` for Azure ML job submission
-- `scripts/aml_upload.sh` for uploading datasets to Azure
-- `scripts/run_extract.sh` as the Azure extraction entrypoint
-- `scripts/create_model_registry_entry.py` and `scripts/list_checkpoints.sh` for checkpoint tracking
+**ALL scripts (Python, shell, notebooks) must be executed in the weather-doc-extractor conda environment.**
 
-Prefer datastore-backed paths for all persistent inputs, outputs, caches, and checkpoints. HF caches should live on the datastore mount, not in `/tmp`.
+- Activate: `conda activate weather-doc-extractor`
+- Do not run scripts with system Python or other environments
+- Do not suggest or create workarounds that bypass the environment
+- If creating new scripts, always include environment setup instructions in docstrings/comments
+- When documenting CLI commands, always prefix with environment activation
 
-# Data and Checkpoints
+This is non-negotiable to maintain reproducibility and dependency isolation.
 
-The repository may contain multiple datasets and multiple fine-tuned checkpoints. Treat them as first-class, Azure-hosted artifacts.
+# Required Workflow Scripts
 
-When adding or using a new training dataset:
-- keep image and transcription directories paired,
-- preserve the existing stem naming convention,
-- make sure the dataset can be consumed by the ingest and evaluation pipeline.
+Prefer repository scripts over ad hoc commands:
 
-When adding or using a new checkpoint:
-- store it on Azure datastore,
-- use the checkpoint workflow and registry rather than local copies,
-- make it selectable for extraction through the Azure submission scripts.
+- scripts/aml_submit.sh: submit Azure ML jobs.
+- scripts/aml_upload.sh: upload datasets and assets.
+- scripts/run_extract.sh: Azure extraction entrypoint.
+- scripts/create_model_registry_entry.py: register model checkpoints.
+- scripts/list_checkpoints.sh: inspect checkpoint registry.
 
-# Model Support
+For consensus-stage work:
 
-This repository supports multiple vision-language model families and versions. When changing model handling:
-- preserve backward compatibility for existing presets,
-- update model preset configuration, inference routing, fine-tuning logic, and CLI help together,
-- add or update tests for detection, message formatting, and training/example construction,
-- update documentation alongside code changes.
+- scripts/build_consensus_transcriptions.py: build consensus JSONs.
+- scripts/prepare_consensus_dataset.py: create dataset layout for consensus runs.
+- scripts/plot_consensus_validation.py: single-image consensus visual check.
+- scripts/validate_consensus.py: batch consensus validation figures.
 
-Be careful with model family-specific behavior. Different model families may require different message formatting, processor handling, or environment variants.
+# Data and Checkpoint Rules
+
+Treat datasets and checkpoints as Azure-hosted first-class artifacts.
+
+For datasets:
+
+- Keep images and transcriptions paired.
+- Preserve existing stem naming.
+- Maintain compatibility with ingest and evaluation pipelines.
+
+For checkpoints:
+
+- Store on Azure datastore.
+- Use registry scripts and documented checkpoint workflow.
+- Keep checkpoints selectable through submission scripts.
+
+# Model Change Rules
+
+When changing model family handling:
+
+1. Preserve backward compatibility for existing presets.
+2. Update presets, inference routing, fine-tuning logic, and CLI help together.
+3. Update or add tests for model detection, message formatting, and training example construction.
+4. Update documentation in the same change set.
+
+Model families may need different processor logic, prompt/message formatting, and environment variants.
 
 # Editing Expectations
 
-Prefer small, focused changes that fix the root cause.
+- Make small, focused changes that address the root cause.
+- Avoid unrelated refactors.
+- Do not change model behavior without test updates.
+- Do not add dependencies unless necessary and documented.
+- Do not move expected Azure-hosted artifacts back to local-only paths.
 
-Do not:
-- make unrelated refactors,
-- change model behavior without updating tests,
-- introduce new dependencies unless they are required and documented,
-- move artifacts back to local storage if they are expected to be Azure-hosted.
+If extraction or fine-tuning code changes, validate both paths when practical.
 
-If a change touches extraction or fine-tuning, verify both paths when practical.
+# Documentation Requirements
 
-# Documentation
+If you change CLI behavior, model presets, checkpoint handling, or Azure submission behavior:
 
-If you change CLI behavior, model presets, checkpoint handling, or Azure job submission:
-- update the README or docs as needed,
-- keep usage examples aligned with the scripts,
-- make sure the docs reflect the current Azure workflow.
+1. Update README/docs.
+2. Keep command examples accurate.
+3. Keep docs aligned with current Azure workflow.
+
+# New Script and Feature Implementation
+
+When creating new scripts or implementing new features:
+
+1. **Always include environment activation** in script docstrings, comments, or shell script headers
+2. **Document environment requirements** explicitly (e.g., "ENVIRONMENT: Run in weather-doc-extractor conda environment")
+3. **Add examples** showing correct environment activation in docstrings and help text
+4. **Write tests** that run in the proper environment
+5. **Update this instructions file** if the new feature needs special environment handling
+6. **Do not create scripts that run outside the weather-doc-extractor environment**
+
+Example for new Python scripts:
+```python
+#!/usr/bin/env python3
+"""Script description.
+
+ENVIRONMENT: Run this script in the weather-doc-extractor conda environment:
+  conda activate weather-doc-extractor
+  python scripts/my_script.py [options]
+"""
+```
+
+Example for new shell scripts:
+```bash
+#!/bin/bash
+# ENVIRONMENT: Run in weather-doc-extractor conda environment
+#   conda activate weather-doc-extractor
+
+# Rest of script...
+```
 
 # General Guidance
 
-Follow the existing code style and keep changes consistent with the repository structure. If a requested change depends on Azure ML behavior, prefer a repository-native solution over a one-off workaround.
+Follow existing project style and structure.
+Prefer repository-native Azure ML solutions over one-off workarounds.
 

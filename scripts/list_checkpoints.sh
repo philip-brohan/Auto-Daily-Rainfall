@@ -72,15 +72,22 @@ if not registry.get("models"):
     print("No checkpoints registered.")
 else:
     # Print header
-    print(f"{'Checkpoint Name':<40} {'Base Model':<15} {'Dataset':<10} {'Created':<20}")
-    print("─" * 85)
+    print(f"{'Checkpoint Name':<34} {'Base Model':<12} {'Dataset':<24} {'Status':<10} {'Created':<12}")
+    print("─" * 96)
     
     for model in registry["models"]:
         name = model.get("checkpoint_name", "unknown")
         base = model.get("base_model", "unknown")
         dset = model.get("dataset", "unknown")
+        status = model.get("status", "completed")
         created = model.get("created_at", "unknown")[:10]  # Date only
-        print(f"{name:<40} {base:<15} {dset:<10} {created:<20}")
+        print(f"{name:<34} {base:<12} {dset:<24} {status:<10} {created:<12}")
+
+    print()
+    print("Job IDs:")
+    for i, model in enumerate(registry["models"], 1):
+        job_id = model.get("job_id") or "(not recorded)"
+        print(f"  {i}. {job_id}")
     
     print()
     print("Extract using a checkpoint:")

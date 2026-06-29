@@ -29,6 +29,10 @@ inputs:
     type: uri_folder
     path: azureml://datastores/workspaceblobstore/paths/Daily_rainfall_sample/images
     mode: ro_mount
+  checkpoint_dir:
+    type: uri_folder
+    path: azureml://datastores/workspaceblobstore/paths/Daily_rainfall_sample/images
+    mode: ro_mount
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
 outputs:
@@ -49,10 +53,12 @@ outputs:
 # overridden per-submission with: --set environment_variables.SHARD=<n>
 # Add --set environment_variables.EXTRACT_LIMIT=5 to process only 5 images.
 # PYTHONPATH=src makes the local package importable without pip install.
+# WEATHER_CHECKPOINT is set if a checkpoint input is provided; otherwise empty.
 command: >-
   export WEATHER_IMAGES_DIR=${{inputs.images_dir}} &&
   export OUTPUT_DIR=${{outputs.extractions}} &&
   export HF_HOME=${{outputs.hf_cache}} &&
+  export WEATHER_CHECKPOINT=${{inputs.checkpoint_dir}} &&
   bash scripts/run_extract.sh
 
 # ── Environment variables ─────────────────────────────────────────────────────
@@ -62,14 +68,18 @@ environment_variables:
   # Number of images per forward pass. Larger = better GPU utilisation but more VRAM.
   # 4 is a safe default for 16GB V100; increase for A100 (40GB).
   BATCH_SIZE: "4"
+  # Number of extraction workers launched per node (one per GPU).
+  # Set to 8 for Standard_ND96amsr_A100_v4 to use all GPUs on the node.
+  NODE_GPU_WORKERS: "1"
   SHARD: "1"
   TOTAL_SHARDS: "1"
 
   # Uncomment to process only N images per shard (useful for smoke tests).
   # EXTRACT_LIMIT: "5"
 
-  # Model to use.  "smolvlm" resolves to HuggingFaceTB/SmolVLM-500M-Instruct.
-  WEATHER_MODEL: smolvlm
+  # Model to use (required — must be set at submission time via aml_submit.sh --model).
+  # "smolvlm" resolves to HuggingFaceTB/SmolVLM-500M-Instruct.
+  WEATHER_MODEL: ""
 
   # HuggingFace token — required for gated models (Gemma 3/4, Llama, etc.).
   # Set HF_TOKEN in azureml/config.env; aml_submit.sh passes it at submission time.

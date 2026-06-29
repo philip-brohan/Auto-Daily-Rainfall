@@ -9,9 +9,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from weather_doc_extractor.finetune import (
+    _consensus_answer_and_char_mask,
+    _effective_gradient_accumulation_steps,
+    _find_last_subsequence,
     _ground_truth_json,
+    _remote_code_kwargs_for_family,
+    _training_device_map,
     build_training_example,
     build_training_examples,
+    build_consensus_training_example,
 )
 from weather_doc_extractor.schemas import DailyRainfallGrid, DailyRainfallRecord
 
@@ -227,6 +233,146 @@ class TestBuildTrainingExamples:
         user_content = examples[0]["messages"][0]["content"]
         img_item = next(c for c in user_content if c.get("type") == "image")
         assert isinstance(img_item.get("image"), PILImage.Image)
+
+
+class TestConsensusHelpers:
+    def test_consensus_answer_mask_marks_only_correct_values(self):
+        consensus = {
+            "Day 1": [
+                {"value": 0.12, "correct": True},
+                {"value": 0.34, "correct": False},
+            ]
+            + [{"value": None, "correct": False}] * 10,
+            **{
+                f"Day {i}": [{"value": None, "correct": False}] * 12
+                for i in range(2, 32)
+            },
+            "Totals": [{"value": None, "correct": False}] * 12,
+        }
+
+        answer, char_mask = _consensus_answer_and_char_mask(consensus)
+        assert len(answer) == len(char_mask)
+        assert any(char_mask)
+
+        token = "0.12"
+        idx = answer.find(token)
+        assert idx >= 0
+        assert all(char_mask[idx : idx + len(token)])
+
+        token_false = "0.34"
+        idx_false = answer.find(token_false)
+        assert idx_false >= 0
+        assert not any(char_mask[idx_false : idx_false + len(token_false)])
+
+
+class TestTrainingDeviceMap:
+    def test_single_process_keeps_auto(self):
+        with patch.dict("os.environ", {}, clear=False):
+            assert _training_device_map("auto") == "auto"
+
+    def test_distributed_auto_maps_to_local_rank(self):
+        with patch.dict(
+            "os.environ", {"WORLD_SIZE": "8", "LOCAL_RANK": "3"}, clear=False
+        ):
+            assert _training_device_map("auto") == {"": 3}
+
+    def test_distributed_explicit_device_is_preserved(self):
+        with patch.dict(
+            "os.environ", {"WORLD_SIZE": "8", "LOCAL_RANK": "2"}, clear=False
+        ):
+            assert _training_device_map("cuda:0") == "cuda:0"
+
+
+class TestEffectiveGradientAccumulationSteps:
+    def test_single_process_keeps_base(self):
+        assert _effective_gradient_accumulation_steps(8, 1, True) == 8
+
+    def test_distributed_scales_down_with_ceil_division(self):
+        assert _effective_gradient_accumulation_steps(8, 8, True) == 1
+        assert _effective_gradient_accumulation_steps(8, 3, True) == 3
+
+    def test_auto_scale_disabled_keeps_base(self):
+        assert _effective_gradient_accumulation_steps(8, 8, False) == 8
+
+    def test_never_below_one(self):
+        assert _effective_gradient_accumulation_steps(0, 8, True) == 1
+
+    def test_build_consensus_training_example_returns_none_without_correct_cells(
+        self, tmp_path
+    ):
+        record = _make_record(tmp_path)
+        consensus = {
+            **{
+                f"Day {i}": [{"value": None, "correct": False}] * 12
+                for i in range(1, 32)
+            },
+            "Totals": [{"value": None, "correct": False}] * 12,
+        }
+        record.transcription_path.write_text(json.dumps(consensus), encoding="utf-8")
+
+        ex = build_consensus_training_example(record, "smolvlm2")
+        assert ex is None
+
+    def test_find_last_subsequence(self):
+        hay = [1, 2, 3, 2, 3, 4]
+        needle = [2, 3]
+        assert _find_last_subsequence(hay, needle) == 3
+
+    def test_consensus_training_example_granite_embeds_pil_image(self, tmp_path):
+        from PIL import Image as PILImage
+
+        record = _make_record(tmp_path)
+        consensus = {
+            "Day 1": [{"value": 0.12, "correct": True}]
+            + [{"value": None, "correct": False}] * 11,
+            **{
+                f"Day {i}": [{"value": None, "correct": False}] * 12
+                for i in range(2, 32)
+            },
+            "Totals": [{"value": None, "correct": False}] * 12,
+        }
+        record.transcription_path.write_text(json.dumps(consensus), encoding="utf-8")
+
+        ex = build_consensus_training_example(record, "granite4")
+        assert ex is not None
+        user_content = ex["messages"][0]["content"]
+        img_item = next(c for c in user_content if c.get("type") == "image")
+        assert isinstance(img_item.get("image"), PILImage.Image)
+
+    def test_consensus_training_example_gemma3_embeds_pil_image(self, tmp_path):
+        from PIL import Image as PILImage
+
+        record = _make_record(tmp_path)
+        consensus = {
+            "Day 1": [{"value": 0.12, "correct": True}]
+            + [{"value": None, "correct": False}] * 11,
+            **{
+                f"Day {i}": [{"value": None, "correct": False}] * 12
+                for i in range(2, 32)
+            },
+            "Totals": [{"value": None, "correct": False}] * 12,
+        }
+        record.transcription_path.write_text(json.dumps(consensus), encoding="utf-8")
+
+        ex = build_consensus_training_example(record, "gemma3")
+        assert ex is not None
+        user_content = ex["messages"][0]["content"]
+        img_item = next(c for c in user_content if c.get("type") == "image")
+        assert isinstance(img_item.get("image"), PILImage.Image)
+
+
+# ---------------------------------------------------------------------------
+# trust_remote_code behavior by model family
+# ---------------------------------------------------------------------------
+
+
+class TestRemoteCodeKwargs:
+    def test_granite4_disables_trust_remote_code(self):
+        assert _remote_code_kwargs_for_family("granite4") == {}
+
+    def test_other_families_keep_trust_remote_code(self):
+        assert _remote_code_kwargs_for_family("granite") == {"trust_remote_code": True}
+        assert _remote_code_kwargs_for_family("gemma4") == {"trust_remote_code": True}
 
     def test_granite4_family_produces_embedded_pil(self, tmp_path):
         from PIL import Image as PILImage

@@ -227,6 +227,15 @@ submitting so you can verify them.  Override any value on the command line:
 bash scripts/aml_submit.sh --total-shards 8 --compute big-gpu-cluster extract
 ```
 
+For multi-GPU nodes (for example `Standard_ND96amsr_A100_v4` with 8 GPUs),
+you can run one extraction worker per GPU inside each AML job:
+
+```bash
+bash scripts/aml_submit.sh --total-shards 1 --node-gpu-workers 8 extract
+```
+
+This keeps a single AML job per model while saturating all 8 GPUs on the node.
+
 ### Collecting results
 
 After all tasks finish, the output directory contains one JSON per image.
@@ -307,8 +316,29 @@ az ml job create \
 ```
 
 Edit `azureml/finetune_job.yml` to choose your compute cluster name and data
-paths.  The default command is a plain `python -m weather_doc_extractor.cli finetune`
-(single GPU — no Accelerate launcher required).
+paths.  The job now auto-launches with `accelerate` when
+`WEATHER_NUM_PROCESSES > 1`.
+
+For `Standard_ND96amsr_A100_v4`, set 8 processes to use all GPUs:
+
+```bash
+bash scripts/aml_submit.sh --compute A100x8 --finetune-gpu-workers 8 finetune
+```
+
+Use `--finetune-gpu-workers 1` if you want single-GPU fine-tuning.
+
+By default, gradient accumulation is auto-scaled by world size to keep global
+batch size approximately stable across 1-GPU and multi-GPU runs.
+Override if needed:
+
+```bash
+bash scripts/aml_submit.sh \
+    --compute A100x8 \
+    --finetune-gpu-workers 8 \
+    --grad-accum-steps 8 \
+    --auto-scale-grad-accum true \
+    finetune
+```
 
 ### Local / single-GPU run
 

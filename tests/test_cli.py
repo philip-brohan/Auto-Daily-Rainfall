@@ -2,6 +2,8 @@ import io
 import json
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
 
 from weather_doc_extractor.cli import run
 from weather_doc_extractor.config import MODEL_PRESETS
@@ -74,6 +76,58 @@ class CliTests(unittest.TestCase):
             code = run(["extract", "--model", "granite", "/nonexistent/image.jpg"])
         self.assertEqual(code, 1)
         self.assertIn("not found", err.getvalue())
+
+    def test_visualize_consensus_missing_image_returns_error(self) -> None:
+        from io import StringIO
+        from contextlib import redirect_stderr
+
+        err = StringIO()
+        with redirect_stderr(err):
+            code = run(["visualize-consensus", "/nonexistent/image.jpg"])
+        self.assertEqual(code, 1)
+        self.assertIn("Image not found", err.getvalue())
+
+    def test_visualize_consensus_missing_args_shows_usage(self) -> None:
+        from io import StringIO
+        from contextlib import redirect_stderr
+
+        err = StringIO()
+        with redirect_stderr(err):
+            code = run(["visualize-consensus"])
+        self.assertEqual(code, 1)
+        self.assertIn("Usage: visualize-consensus", err.getvalue())
+
+    def test_finetune_consensus_command_calls_pipeline(self) -> None:
+        captured = []
+
+        def _capture(config):
+            captured.append(config)
+            return Path("/tmp/adapter-consensus")
+
+        with patch(
+            "weather_doc_extractor.cli.run_finetune_consensus", side_effect=_capture
+        ):
+            exit_code = run(
+                [
+                    "finetune-consensus",
+                    "--model",
+                    "smolvlm2",
+                    "--epochs",
+                    "2",
+                    "--consensus-dir",
+                    "outputs/consensus_dataset_1000/transcriptions",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(len(captured), 1)
+        cfg = captured[0]
+        self.assertEqual(cfg.training.epochs, 2)
+        self.assertEqual(cfg.model.model_name, MODEL_PRESETS["smolvlm2"])
+        self.assertEqual(
+            str(cfg.ingest.transcriptions_dir),
+            "outputs/consensus_dataset_1000/transcriptions",
+        )
 
 
 if __name__ == "__main__":

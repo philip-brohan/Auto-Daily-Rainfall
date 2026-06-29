@@ -6,6 +6,7 @@ dependencies:
   - pip
   - pillow
   - matplotlib
+  - nbformat
   - pip:
       # PyTorch 2.8 with CUDA 12.6 wheels — satisfies torch>=2.6 (Gemma 3/4).
       # A100 nodes support CUDA 12.6.

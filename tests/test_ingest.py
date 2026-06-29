@@ -30,6 +30,18 @@ class ParseStemTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_stem("DRain_1871-1880_Cornwall")
 
+    def test_collision_suffix_is_ignored(self) -> None:
+        result = parse_stem("DRain_1871-1880_Cornwall-59__deadbeef")
+        self.assertEqual(result["decade"], "1871-1880")
+        self.assertEqual(result["county"], "Cornwall")
+        self.assertEqual(result["station_id"], "59")
+
+    def test_collision_suffix_with_index_is_ignored(self) -> None:
+        result = parse_stem("DRain_1871-1880_Cornwall-59__deadbeef_2")
+        self.assertEqual(result["decade"], "1871-1880")
+        self.assertEqual(result["county"], "Cornwall")
+        self.assertEqual(result["station_id"], "59")
+
 
 class LoadGridTests(unittest.TestCase):
     def _make_transcription(self, tmp_dir: Path) -> Path:
@@ -100,6 +112,11 @@ class ScanRecordsTests(unittest.TestCase):
         path.write_text(json.dumps(data), encoding="utf-8")
         return path
 
+    def _make_jpeg_image(self, images_dir: Path, stem: str) -> Path:
+        img_path = images_dir / f"{stem}.jpeg"
+        img_path.write_bytes(b"\xff\xd8\xff\xd9")
+        return img_path
+
     def test_paired_record(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             images_dir, transcriptions_dir = self._setup_dirs(Path(tmp))
@@ -158,6 +175,31 @@ class ScanRecordsTests(unittest.TestCase):
             records = scan_records(images_dir, transcriptions_dir)
 
         self.assertEqual([r.stem for r in records], sorted(stems))
+
+    def test_collision_suffixed_stem_included(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir, transcriptions_dir = self._setup_dirs(Path(tmp))
+            stem = "DRain_1871-1880_Cornwall-59__deadbeef"
+            self._make_image(images_dir, stem)
+
+            records = scan_records(images_dir, transcriptions_dir)
+
+        self.assertEqual(len(records), 1)
+        rec = records[0]
+        self.assertEqual(rec.county, "Cornwall")
+        self.assertEqual(rec.station_id, "59")
+        self.assertEqual(rec.decade, "1871-1880")
+
+    def test_jpeg_extension_included(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            images_dir, transcriptions_dir = self._setup_dirs(Path(tmp))
+            stem = "DRain_1871-1880_Hampshire-42"
+            self._make_jpeg_image(images_dir, stem)
+
+            records = scan_records(images_dir, transcriptions_dir)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].stem, stem)
 
     def test_scan_sample_data(self) -> None:
         """Integration check against the real Daily_rainfall_sample data."""

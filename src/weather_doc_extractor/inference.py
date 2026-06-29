@@ -44,6 +44,63 @@ _FAMILY_PATTERNS: list[tuple[str, list[str]]] = [
 ]
 
 
+def _extract_hf_model_id_from_snapshot_path(path_like: str) -> str | None:
+    """Derive a HuggingFace model ID from a hub snapshot/cache path.
+
+    Example:
+    ``.../hub/models--HuggingFaceTB--SmolVLM2-2.2B-Instruct/snapshots/<sha>``
+    -> ``HuggingFaceTB/SmolVLM2-2.2B-Instruct``
+    """
+    marker = "models--"
+    snapshots = "/snapshots/"
+    norm = str(path_like).replace("\\", "/")
+
+    start = norm.find(marker)
+    if start < 0:
+        return None
+    after = norm[start + len(marker) :]
+    end = after.find(snapshots)
+    if end < 0:
+        return None
+
+    repo_token = after[:end]
+    parts = repo_token.split("--", 1)
+    if len(parts) != 2:
+        return None
+    org, repo = parts[0].strip(), parts[1].strip()
+    if not org or not repo:
+        return None
+    return f"{org}/{repo}"
+
+
+def _normalize_model_reference(model_ref: str) -> str:
+    """Normalize model references from adapter configs across environments.
+
+    PEFT adapters can store ``base_model_name_or_path`` as an absolute cache
+    snapshot path from a different machine/job. When that path is not present
+    in the current runtime, convert it to a canonical HF model ID.
+    """
+    raw = str(model_ref).strip()
+    if not raw:
+        return raw
+
+    p = Path(raw)
+    if p.exists():
+        return raw
+
+    hf_model_id = _extract_hf_model_id_from_snapshot_path(raw)
+    if hf_model_id:
+        print(
+            f"[adapter] Normalized base model reference:\n"
+            f"           {raw}\n"
+            f"        -> {hf_model_id}",
+            flush=True,
+        )
+        return hf_model_id
+
+    return raw
+
+
 def detect_model_family(model_name: str) -> str:
     """Return the model family for *model_name*.
 
@@ -62,6 +119,7 @@ def detect_model_family(model_name: str) -> str:
         name = _json.loads(adapter_cfg.read_text()).get(
             "base_model_name_or_path", model_name
         )
+        name = _normalize_model_reference(str(name))
 
     lower = name.lower()
     for family, patterns in _FAMILY_PATTERNS:
@@ -286,9 +344,36 @@ def parse_extraction_response(text: str) -> DailyRainfallGrid | None:
 
 
 def _is_adapter_path(name: str) -> bool:
-    """Return True if *name* is a local directory containing a LoRA adapter."""
+    """Return True if *name* is a local directory containing a LoRA adapter.
+
+    A path is considered an adapter path if:
+    1. It's an existing directory with adapter_config.json, OR
+    2. It looks like a checkpoint path (contains /outputs/checkpoints/) even if
+       the directory doesn't exist yet (e.g., when passed as an Azure mount path).
+    """
     p = Path(name)
-    return p.is_dir() and (p / "adapter_config.json").exists()
+
+    # Existing directory with adapter_config.json
+    if p.is_dir() and (p / "adapter_config.json").exists():
+        print(
+            f"[adapter] Path recognized as adapter (has adapter_config.json): {name}",
+            flush=True,
+        )
+        return True
+
+    # Looks like a checkpoint path from the registry
+    # (e.g., "Daily_rainfall_sample/outputs/checkpoints/...")
+    is_checkpoint_pattern = "/outputs/checkpoints/" in str(
+        name
+    ) or "\\outputs\\checkpoints\\" in str(name)
+    if is_checkpoint_pattern:
+        print(
+            f"[adapter] Path recognized as checkpoint (matches pattern): {name}",
+            flush=True,
+        )
+        return True
+
+    return False
 
 
 def _gpu_dtype() -> "torch.dtype":
@@ -386,6 +471,10 @@ def _resolve_model_path(model_name: str) -> str:
 
     from huggingface_hub import snapshot_download
     from huggingface_hub.utils import LocalEntryNotFoundError
+
+    model_name = _normalize_model_reference(model_name)
+    if Path(model_name).exists():
+        return model_name
 
     def _snapshot_is_complete(snapshot_path: Path) -> tuple[bool, str]:
         """Return (ok, reason) for a cached HF snapshot directory."""
@@ -655,63 +744,110 @@ def _load_model_and_processor(config: ModelConfig):  # type: ignore[return]
 
     model_device_map: str | None = config.device
 
+    print(
+        f"[load_model] Attempting to load: {config.model_name}",
+        flush=True,
+    )
+
     if _is_adapter_path(config.model_name):
         import json as _json
 
         from peft import PeftModel
 
         adapter_dir = Path(config.model_name)
-        adapter_cfg = _json.loads((adapter_dir / "adapter_config.json").read_text())
-        base_model_name = adapter_cfg["base_model_name_or_path"]
-        resolved_name = _resolve_model_path(base_model_name)
+        adapter_cfg_path = adapter_dir / "adapter_config.json"
 
-        proc_kwargs: dict[str, Any] = (
-            {} if family == "granite4" else {"trust_remote_code": True}
+        if not adapter_cfg_path.exists():
+            print(
+                f"[adapter] WARNING: adapter_config.json not found at {adapter_cfg_path}; "
+                f"treating {config.model_name} as a base model name.",
+                flush=True,
+            )
+            # Fall through to base model loading below
+        else:
+            try:
+                adapter_cfg = _json.loads(adapter_cfg_path.read_text())
+                base_model_name_raw = str(adapter_cfg["base_model_name_or_path"])
+                base_model_name = _normalize_model_reference(base_model_name_raw)
+                print(
+                    f"[adapter] Loading checkpoint from {config.model_name}\n"
+                    f"           Base model: {base_model_name}",
+                    flush=True,
+                )
+                resolved_name = _resolve_model_path(base_model_name)
+
+                proc_kwargs: dict[str, Any] = (
+                    {} if family == "granite4" else {"trust_remote_code": True}
+                )
+                if hf_cache_dir:
+                    proc_kwargs["cache_dir"] = hf_cache_dir
+                processor = _load_processor_with_fallback(
+                    AutoProcessor,
+                    base_model_name,
+                    resolved_name,
+                    proc_kwargs,
+                )
+                model_kwargs: dict[str, Any] = {
+                    "torch_dtype": _gpu_dtype(),
+                    "device_map": model_device_map,
+                    **extra_kwargs,
+                }
+                base = _load_model_with_fallback(
+                    model_cls,
+                    base_model_name,
+                    resolved_name,
+                    model_kwargs,
+                )
+                model = PeftModel.from_pretrained(base, str(adapter_dir))
+                print(
+                    f"[adapter] LoRA adapter loaded successfully.",
+                    flush=True,
+                )
+
+                model.eval()
+                _sync_cache_to_remote(local_cache)
+                return processor, model
+            except Exception as exc:
+                print(
+                    f"[adapter] WARNING: failed to load adapter ({exc}); "
+                    f"falling back to base model loading.",
+                    flush=True,
+                )
+                # Fall through to base model loading below
+
+    # Base model loading (either no adapter was provided, or adapter loading failed)
+    if _is_adapter_path(config.model_name):
+        # This was marked as an adapter path but couldn't be loaded; try as a base model
+        print(
+            f"[model] **CRITICAL**: Checkpoint path provided but adapter not found/loaded!"
+            f"\n         Path: {config.model_name}"
+            f"\n         Falling back to base model - extraction will use UNTRAINED model!",
+            flush=True,
         )
-        if hf_cache_dir:
-            proc_kwargs["cache_dir"] = hf_cache_dir
-        processor = _load_processor_with_fallback(
-            AutoProcessor,
-            base_model_name,
-            resolved_name,
-            proc_kwargs,
-        )
-        model_kwargs: dict[str, Any] = {
-            "torch_dtype": _gpu_dtype(),
-            "device_map": model_device_map,
-            **extra_kwargs,
-        }
-        base = _load_model_with_fallback(
-            model_cls,
-            base_model_name,
-            resolved_name,
-            model_kwargs,
-        )
-        model = PeftModel.from_pretrained(base, str(adapter_dir))
-    else:
-        resolved_name = _resolve_model_path(config.model_name)
-        proc_kwargs: dict[str, Any] = (
-            {} if family == "granite4" else {"trust_remote_code": True}
-        )
-        if hf_cache_dir:
-            proc_kwargs["cache_dir"] = hf_cache_dir
-        processor = _load_processor_with_fallback(
-            AutoProcessor,
-            config.model_name,
-            resolved_name,
-            proc_kwargs,
-        )
-        model_kwargs = {
-            "torch_dtype": _gpu_dtype(),
-            "device_map": model_device_map,
-            **extra_kwargs,
-        }
-        model = _load_model_with_fallback(
-            model_cls,
-            config.model_name,
-            resolved_name,
-            model_kwargs,
-        )
+
+    resolved_name = _resolve_model_path(config.model_name)
+    proc_kwargs: dict[str, Any] = (
+        {} if family == "granite4" else {"trust_remote_code": True}
+    )
+    if hf_cache_dir:
+        proc_kwargs["cache_dir"] = hf_cache_dir
+    processor = _load_processor_with_fallback(
+        AutoProcessor,
+        config.model_name,
+        resolved_name,
+        proc_kwargs,
+    )
+    model_kwargs: dict[str, Any] = {
+        "torch_dtype": _gpu_dtype(),
+        "device_map": model_device_map,
+        **extra_kwargs,
+    }
+    model = _load_model_with_fallback(
+        model_cls,
+        config.model_name,
+        resolved_name,
+        model_kwargs,
+    )
 
     model.eval()
 
@@ -788,8 +924,6 @@ def extract_grid_batch_with_model(
             "Install the 'train' extras to run inference: pip install -e '.[train]'"
         ) from exc
 
-    images = [PILImage.open(p).convert("RGB") for p in image_paths]
-
     do_sample = config.temperature > 0.0
     generate_kwargs: dict[str, Any] = dict(
         max_new_tokens=config.max_new_tokens,
@@ -798,16 +932,71 @@ def extract_grid_batch_with_model(
     if do_sample:
         generate_kwargs["temperature"] = config.temperature
 
-    if family.startswith("granite") or family in ("gemma3", "gemma4"):
-        # These families require per-image processing: Granite and Gemma 3 embed
-        # the image in the message, Gemma 4 has a processor API that is
-        # not straightforwardly batched.
-        return [
-            extract_grid_with_model(p, config, processor, model, family)
+    images = [PILImage.open(p).convert("RGB") for p in image_paths]
+
+    if family.startswith("granite") or family == "gemma3":
+        # Granite 4 / Gemma 3: batch by passing one conversation per sample,
+        # each with its own embedded PIL image.
+        messages_batch = [
+            build_messages(p, model_family=family, pil_image=img)
+            for p, img in zip(image_paths, images)
+        ]
+        template_kwargs: dict[str, Any] = {
+            "add_generation_prompt": True,
+            "tokenize": True,
+            "return_dict": True,
+            "return_tensors": "pt",
+            "padding": True,
+        }
+        if family == "gemma3":
+            template_kwargs["do_pan_and_scan"] = True
+
+        inputs = processor.apply_chat_template(messages_batch, **template_kwargs)
+        if hasattr(inputs, "to"):
+            inputs = inputs.to(model.device)
+        else:
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+        with torch.inference_mode():
+            output_ids = model.generate(**inputs, **generate_kwargs)
+
+        input_len = inputs["input_ids"].shape[1]
+        raw_texts: list[str] = processor.batch_decode(
+            output_ids[:, input_len:],
+            skip_special_tokens=True,
+        )
+        return [(parse_extraction_response(raw), raw) for raw in raw_texts]
+
+    if family == "gemma4":
+        # Gemma 4: batch text prompts and provide one image list per prompt.
+        text_prompts = [
+            processor.apply_chat_template(
+                build_messages(p, model_family=family),
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
             for p in image_paths
         ]
+        inputs = processor(
+            text=text_prompts,
+            images=[[img] for img in images],
+            return_tensors="pt",
+            padding=True,
+        )
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
-    # SmolVLM / generic: build one prompt per image, batch-tokenise with padding
+        with torch.inference_mode():
+            output_ids = model.generate(**inputs, **generate_kwargs)
+
+        input_len = inputs["input_ids"].shape[1]
+        raw_texts: list[str] = processor.batch_decode(
+            output_ids[:, input_len:],
+            skip_special_tokens=True,
+        )
+        return [(parse_extraction_response(raw), raw) for raw in raw_texts]
+
+    # SmolVLM / generic: batch text prompts and pass one image per sample.
     text_prompts = [
         processor.apply_chat_template(
             build_messages(p, model_family=family),
@@ -816,9 +1005,10 @@ def extract_grid_batch_with_model(
         )
         for p in image_paths
     ]
+    # For SmolVLM, images must be nested per prompt: [[img1], [img2], ...]
     inputs = processor(
         text=text_prompts,
-        images=images,
+        images=[[img] for img in images],
         return_tensors="pt",
         padding=True,
     )
@@ -827,16 +1017,13 @@ def extract_grid_batch_with_model(
     with torch.inference_mode():
         output_ids = model.generate(**inputs, **generate_kwargs)
 
-    # Inputs are left-padded to a uniform length; strip that prefix from outputs
+    # Inputs are padded to a uniform length; strip that prefix from outputs.
     input_len = inputs["input_ids"].shape[1]
-    results: list[tuple[DailyRainfallGrid | None, str]] = []
-    for i in range(len(image_paths)):
-        raw_text: str = processor.decode(
-            output_ids[i, input_len:],
-            skip_special_tokens=True,
-        )
-        results.append((parse_extraction_response(raw_text), raw_text))
-    return results
+    raw_texts: list[str] = processor.batch_decode(
+        output_ids[:, input_len:],
+        skip_special_tokens=True,
+    )
+    return [(parse_extraction_response(raw), raw) for raw in raw_texts]
 
 
 def extract_grid(

@@ -57,7 +57,7 @@ def _cell_text(grid: "DailyRainfallGrid") -> list[list[str]]:
 
 def _fmt(v: float | None) -> str:
     if v is None:
-        return "—"
+        return "null"
     return f"{v:.2f}" if v != int(v) else f"{v:.0f}"
 
 

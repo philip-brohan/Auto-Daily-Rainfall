@@ -6,6 +6,8 @@ dependencies:
   - pip
   - pillow
   - matplotlib
+  - nbformat
+  - ipykernel
   - pip:
       - -e .
       - accelerate

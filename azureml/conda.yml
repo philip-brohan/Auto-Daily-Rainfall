@@ -6,6 +6,7 @@ dependencies:
   - pip
   - pillow
   - matplotlib
+  - nbformat
   - pip:
       # Pin torch to a CUDA 12.1 wheel explicitly. Without this, pip resolves
       # the torch dependency from accelerate/trl/peft and upgrades to the

@@ -12,6 +12,11 @@ azureml/.environment_tmp.yml
 
 # Ignore artificially generated fake data files
 fake_daily_rainfall/
+fake_daily_rainfall_2/
+test_data/fake/
+
+# Ignore image subsets assembled for consensus training
+consensus_data/
 
 # Ignore model outputs
 outputs/

@@ -19,6 +19,17 @@ from weather_doc_extractor.schemas import DailyRainfallGrid, DailyRainfallRecord
 
 # DRain_{decade}_{County}-{station_id}
 _STEM_RE = re.compile(r"^DRain_(\d{4}-\d{4})_(.+)-(\d+)$")
+_COLLISION_SUFFIX_RE = re.compile(r"__(?:[0-9a-f]{8})(?:_\d+)?$")
+
+
+def _strip_collision_suffix(stem: str) -> str:
+    """Remove sampler-added collision suffixes from stems.
+
+    sample_unseen_images.py may append ``__<8hex>`` (optionally ``_<n>``)
+    when two source files share the same basename. The metadata-bearing
+    DRain prefix remains intact, so strip only this trailing collision tag.
+    """
+    return _COLLISION_SUFFIX_RE.sub("", stem)
 
 
 def parse_stem(stem: str) -> dict[str, str]:
@@ -26,7 +37,7 @@ def parse_stem(stem: str) -> dict[str, str]:
 
     Raises ``ValueError`` if the stem does not match the expected pattern.
     """
-    m = _STEM_RE.match(stem)
+    m = _STEM_RE.match(_strip_collision_suffix(stem))
     if not m:
         raise ValueError(f"Stem does not match expected pattern: {stem!r}")
     decade, county, station_id = m.groups()
@@ -73,7 +84,10 @@ def scan_records(
     processed later.  Records are sorted by stem for reproducibility.
     """
     records: list[DailyRainfallRecord] = []
-    for image_path in sorted(images_dir.glob("*.jpg")):
+    image_paths = sorted(
+        list(images_dir.glob("*.jpg")) + list(images_dir.glob("*.jpeg"))
+    )
+    for image_path in image_paths:
         stem = image_path.stem
         try:
             meta = parse_stem(stem)

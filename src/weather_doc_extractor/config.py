@@ -34,6 +34,13 @@ def _env_float(var: str, default: float) -> float:
     return float(raw) if raw is not None else default
 
 
+def _env_bool(var: str, default: bool) -> bool:
+    raw = os.environ.get(var)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass
 class ProjectPaths:
     # Override via WEATHER_DATA_DIR / WEATHER_OUTPUT_DIR / WEATHER_MODELS_DIR
@@ -105,6 +112,9 @@ class TrainingConfig:
     gradient_accumulation_steps: int = field(
         default_factory=lambda: _env_int("WEATHER_GRAD_ACCUM_STEPS", 8)
     )
+    auto_scale_grad_accum: bool = field(
+        default_factory=lambda: _env_bool("WEATHER_AUTO_SCALE_GRAD_ACCUM", True)
+    )
     eval_split: float = 0.1
     # LoRA hyper-parameters
     lora_r: int = 8
@@ -115,6 +125,24 @@ class TrainingConfig:
     # Experiment tracking backend: "none", "wandb", "tensorboard"
     report_to: str = field(
         default_factory=lambda: _env_str("WEATHER_REPORT_TO", "none")
+    )
+    # Optional consensus training inputs for the additive consensus pathway.
+    consensus_transcriptions_dir: Path | None = field(
+        default_factory=lambda: (
+            _env_path("WEATHER_CONSENSUS_TRANSCRIPTIONS_DIR", "")
+            if _env_str("WEATHER_CONSENSUS_TRANSCRIPTIONS_DIR", "")
+            else None
+        )
+    )
+    checkpoint_dir: Path | None = field(
+        default_factory=lambda: (
+            _env_path("WEATHER_CHECKPOINT_DIR", "")
+            if _env_str("WEATHER_CHECKPOINT_DIR", "")
+            else None
+        )
+    )
+    consensus_strict_masking: bool = field(
+        default_factory=lambda: _env_bool("WEATHER_CONSENSUS_STRICT_MASKING", True)
     )
     extra_args: dict[str, str] = field(default_factory=dict)
 

@@ -4,8 +4,7 @@ display_name: finetune
 experiment_name: weather-doc-extractor
 description: >
   Fine-tune the model using LoRA on paired image/transcription data.
-  Launches with `accelerate` for multi-GPU support when accelerate_config.yaml
-  is present (set ACCELERATE_CONFIG to override the config path).
+  Launches with `accelerate` automatically when WEATHER_NUM_PROCESSES > 1.
 
 # ── Compute ───────────────────────────────────────────────────────────────────
 # Use a multi-GPU SKU (e.g. Standard_NC24s_v3 = 4× V100) for faster training.
@@ -27,6 +26,10 @@ inputs:
     type: uri_folder
     path: azureml://datastores/workspaceblobstore/paths/Daily_rainfall_sample/transcriptions
     mode: ro_mount
+  checkpoint_dir:
+    type: uri_folder
+    path: azureml://datastores/workspaceblobstore/paths/Daily_rainfall_sample/outputs/checkpoints
+    mode: ro_mount
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
 # LoRA adapter checkpoints are written here and uploaded to the workspace
@@ -35,17 +38,27 @@ outputs:
   checkpoints:
     type: uri_folder
     mode: rw_mount
+  # Persistent HuggingFace model cache — shared with extract jobs so weights
+  # are only downloaded once per datastore.
+  hf_cache:
+    type: uri_folder
+    path: azureml://datastores/workspaceblobstore/paths/hf_cache
+    mode: rw_mount
 
 # ── Command ───────────────────────────────────────────────────────────────────
-# Uses accelerate for multi-GPU.  For single-GPU, replace the accelerate launch
-# line with: weather-extract finetune
+# Uses accelerate for multi-GPU when WEATHER_NUM_PROCESSES > 1.
 command: >-
   pip install -e . --quiet &&
-  WEATHER_IMAGES_DIR=${{inputs.images_dir}}
-  WEATHER_TRANSCRIPTIONS_DIR=${{inputs.transcriptions_dir}}
-  WEATHER_TRAINING_OUTPUT_DIR=${{outputs.checkpoints}}
-  python -m weather_doc_extractor.cli
-  finetune
+  export HF_HOME=${{outputs.hf_cache}} &&
+  export WEATHER_IMAGES_DIR=${{inputs.images_dir}} &&
+  export WEATHER_TRANSCRIPTIONS_DIR=${{inputs.transcriptions_dir}} &&
+  export WEATHER_CHECKPOINT_DIR=${{inputs.checkpoint_dir}} &&
+  export WEATHER_TRAINING_OUTPUT_DIR=${{outputs.checkpoints}} &&
+  if [ "${WEATHER_NUM_PROCESSES:-1}" -gt 1 ]; then
+    accelerate launch --num_processes "${WEATHER_NUM_PROCESSES}" --num_machines 1 --mixed_precision bf16 -m weather_doc_extractor.cli "${WEATHER_FINETUNE_MODE}";
+  else
+    python -m weather_doc_extractor.cli "${WEATHER_FINETUNE_MODE}";
+  fi
 
 # ── Environment variables ─────────────────────────────────────────────────────
 environment_variables:
@@ -54,6 +67,9 @@ environment_variables:
   WEATHER_BATCH_SIZE: "1"
   WEATHER_GRAD_ACCUM_STEPS: "8"
   WEATHER_LEARNING_RATE: "0.0002"
+  WEATHER_FINETUNE_MODE: finetune
+  WEATHER_NUM_PROCESSES: "1"
+  WEATHER_AUTO_SCALE_GRAD_ACCUM: "true"
 
   # Set to "wandb" or "tensorboard" to enable experiment tracking.
   WEATHER_REPORT_TO: none

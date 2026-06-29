@@ -1,11 +1,15 @@
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from weather_doc_extractor.inference import (
     EXTRACTION_PROMPT,
     _extract_object,
+    _extract_hf_model_id_from_snapshot_path,
     _load_model_with_fallback,
     _load_processor_with_fallback,
+    _resolve_model_path,
     build_messages,
     detect_model_family,
     parse_extraction_response,
@@ -230,6 +234,38 @@ class ExtractObjectTests(unittest.TestCase):
 
     def test_unknown_returns_generic(self) -> None:
         self.assertEqual(detect_model_family("some-org/some-unknown-model"), "generic")
+
+    def test_extract_hf_model_id_from_snapshot_path(self) -> None:
+        snapshot = (
+            "/mnt/azureml/cr/j/old/wd/hf_cache/hub/"
+            "models--HuggingFaceTB--SmolVLM2-2.2B-Instruct/"
+            "snapshots/482adb537c021c86670beed01cd58990d01e72e4"
+        )
+        self.assertEqual(
+            _extract_hf_model_id_from_snapshot_path(snapshot),
+            "HuggingFaceTB/SmolVLM2-2.2B-Instruct",
+        )
+
+    def test_detect_model_family_from_adapter_with_stale_snapshot_path(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            adapter_cfg = Path(td) / "adapter_config.json"
+            adapter_cfg.write_text(
+                json.dumps(
+                    {
+                        "base_model_name_or_path": (
+                            "/mnt/azureml/cr/j/old/wd/hf_cache/hub/"
+                            "models--HuggingFaceTB--SmolVLM2-2.2B-Instruct/"
+                            "snapshots/482adb537c021c86670beed01cd58990d01e72e4"
+                        )
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(detect_model_family(td), "smolvlm2")
+
+    def test_resolve_model_path_returns_existing_local_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            self.assertEqual(_resolve_model_path(td), td)
 
 
 class BuildMessagesTests(unittest.TestCase):

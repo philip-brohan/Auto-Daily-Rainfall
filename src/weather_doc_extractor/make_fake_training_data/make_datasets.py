@@ -36,6 +36,10 @@ def main(
     font_size_jitter: float = 0.22,
     jitter_grid_points: float = 0.0008,
     jpeg_quality: int = 85,
+    right_day_label_probability: float = 0.9,
+    post_dec_blank_column_probability: float = 0.2,
+    line_intensity_sigma: float = 0.40,
+    individual_line_intensity_sigma: float = 0.0,
 ) -> None:
     """Generate *n_records* image/JSON pairs into *output_dir*.
 
@@ -58,6 +62,16 @@ def main(
         Std-dev of grid-point position jitter (normalised coordinates).
     jpeg_quality:
         JPEG compression quality (1–95).
+    right_day_label_probability:
+        Probability that each rendered record includes the extra right-hand
+        day-label column.
+    post_dec_blank_column_probability:
+        Probability that each rendered record includes a blank column
+        immediately to the right of Dec.
+    line_intensity_sigma:
+        Std-dev of per-page grid line intensity jitter.
+    individual_line_intensity_sigma:
+        Std-dev of per-line intensity variation (additive to per-page baseline).
     """
     master_rng = random.Random(seed)
 
@@ -85,6 +99,10 @@ def main(
             font_size=record_font_size,
             jitter_grid_points=jitter_grid_points,
             jpeg_quality=jpeg_quality,
+            right_day_label_probability=right_day_label_probability,
+            post_dec_blank_column_probability=post_dec_blank_column_probability,
+            line_intensity_sigma=line_intensity_sigma,
+            individual_line_intensity_sigma=individual_line_intensity_sigma,
         )
 
         if idx % 50 == 0 or idx == n_records:
@@ -129,11 +147,43 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--jpeg-quality", type=int, default=85, help="JPEG compression quality (1–95)."
     )
+    p.add_argument(
+        "--right-day-label-probability",
+        type=float,
+        default=0.9,
+        help="Probability of rendering the extra right-hand day-label column (0-1).",
+    )
+    p.add_argument(
+        "--post-dec-blank-column-probability",
+        type=float,
+        default=0.2,
+        help="Probability of rendering a blank column immediately to the right of Dec (0-1).",
+    )
+    p.add_argument(
+        "--line-intensity-sigma",
+        type=float,
+        default=0.40,
+        help="Std-dev of per-page grid line intensity jitter.",
+    )
+    p.add_argument(
+        "--individual-line-intensity-sigma",
+        type=float,
+        default=0.0,
+        help="Std-dev of per-line intensity variation (additive to per-page baseline).",
+    )
     return p
 
 
 if __name__ == "__main__":
     args = _build_parser().parse_args()
+    if not 0.0 <= args.right_day_label_probability <= 1.0:
+        raise ValueError("--right-day-label-probability must be between 0 and 1")
+    if not 0.0 <= args.post_dec_blank_column_probability <= 1.0:
+        raise ValueError("--post-dec-blank-column-probability must be between 0 and 1")
+    if args.line_intensity_sigma < 0.0:
+        raise ValueError("--line-intensity-sigma must be non-negative")
+    if args.individual_line_intensity_sigma < 0.0:
+        raise ValueError("--individual-line-intensity-sigma must be non-negative")
     main(
         n_records=args.n_records,
         output_dir=args.output_dir,
@@ -142,4 +192,8 @@ if __name__ == "__main__":
         font_size_jitter=args.font_size_jitter,
         jitter_grid_points=args.jitter_grid_points,
         jpeg_quality=args.jpeg_quality,
+        right_day_label_probability=args.right_day_label_probability,
+        post_dec_blank_column_probability=args.post_dec_blank_column_probability,
+        line_intensity_sigma=args.line_intensity_sigma,
+        individual_line_intensity_sigma=args.individual_line_intensity_sigma,
     )

@@ -1,0 +1,11 @@
+name: ciara-convert
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pillow
+  - poppler
+  - pip:
+      - pdf2image
+      - openpyxl

@@ -1,5 +1,6 @@
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from weather_doc_extractor.config import AppConfig
 from weather_doc_extractor.evaluate import EvaluationReport, evaluate_dataset
@@ -108,6 +109,20 @@ def run_finetune(config: AppConfig) -> Path:
     return _run_finetune(records, config.model, config.training)
 
 
+def run_finetune_consensus(config: AppConfig) -> Path:
+    """Run additive consensus-only fine-tuning pathway.
+
+    This path is separate from :func:`run_finetune` and is intended for
+    consensus transcriptions with strict token masking.
+    """
+    from weather_doc_extractor.finetune import (
+        run_finetune_consensus as _run_finetune_consensus,
+    )
+
+    records = scan_records(config.ingest.images_dir, config.ingest.transcriptions_dir)
+    return _run_finetune_consensus(records, config.model, config.training)
+
+
 def describe_training_stage() -> str:
     return (
         "Fine-tune the selected model with TRL using labeled extraction "
@@ -121,7 +136,8 @@ def run_batch_extract(
     shard: int | None = None,
     total_shards: int | None = None,
     limit: int | None = None,
-    batch_size: int = 4,
+    batch_size: int = 10,
+    retry_batch_size: int | None = None,
 ) -> dict[str, object]:
     """Run inference on every image in the configured images directory.
 
@@ -142,7 +158,10 @@ def run_batch_extract(
         Useful for quick smoke tests.
     batch_size:
         Number of images to process in each forward pass.  Larger batches
-        improve GPU utilisation but require more VRAM.  Default: 4.
+        improve GPU utilisation but require more VRAM.  Default: 10.
+    retry_batch_size:
+        Number of images to process together during stage-2 retry for parse
+        failures. If unset, defaults to ``min(batch_size, 4)``.
 
     Returns
     -------
@@ -152,6 +171,7 @@ def run_batch_extract(
     from weather_doc_extractor.inference import (
         _load_model_and_processor,
         detect_model_family,
+        extract_grid_with_model,
         extract_grid_batch_with_model,
     )
 
@@ -164,19 +184,43 @@ def run_batch_extract(
         records = records[:limit]
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Filter out records that already have output files (supports resumption after preemption)
+    skipped = 0
+    records_to_process = []
+    for record in records:
+        out_path = output_dir / f"{record.stem}.json"
+        if out_path.exists():
+            skipped += 1
+        else:
+            records_to_process.append(record)
+
+    if skipped > 0:
+        print(
+            f"[resumption] Skipping {skipped} images with existing output files",
+            flush=True,
+        )
+
     succeeded = 0
     failed = 0
+    recovered_by_batch_retry = 0
+    recovered_by_single_retry = 0
 
     print(f"Loading model {config.model.model_name} …", flush=True)
     processor, model = _load_model_and_processor(config.model)
     family = detect_model_family(config.model.model_name)
-    print(f"Processing {len(records)} images in batches of {batch_size} …", flush=True)
+    print(
+        f"Processing {len(records_to_process)} images in batches of {batch_size} …",
+        flush=True,
+    )
 
-    for batch_start in range(0, len(records), batch_size):
-        batch = records[batch_start : batch_start + batch_size]
+    first_pass_failures: list[tuple[Any, str]] = []
+
+    for batch_start in range(0, len(records_to_process), batch_size):
+        batch = records_to_process[batch_start : batch_start + batch_size]
         batch_end = batch_start + len(batch)
         print(
-            f"  [{batch_end}/{len(records)}] "
+            f"  [{batch_end}/{len(records_to_process)}] "
             f"images {batch_start + 1}–{batch_end} …",
             flush=True,
         )
@@ -191,19 +235,98 @@ def run_batch_extract(
                     "grid": grid.to_dict(),
                 }
                 succeeded += 1
+                out_path = output_dir / f"{record.stem}.json"
+                out_path.write_text(json.dumps(result, indent=2, default=str))
             else:
+                first_pass_failures.append((record, raw_text))
+
+    second_pass_failures: list[tuple[Any, str, str]] = []
+    retry_batch_size = (
+        max(1, retry_batch_size)
+        if retry_batch_size is not None
+        else max(1, min(batch_size, 4))
+    )
+    if first_pass_failures:
+        print(
+            f"[retry-2] Reprocessing {len(first_pass_failures)} parse failures "
+            f"in batches of {retry_batch_size} …",
+            flush=True,
+        )
+    for batch_start in range(0, len(first_pass_failures), retry_batch_size):
+        chunk = first_pass_failures[batch_start : batch_start + retry_batch_size]
+        chunk_records = [item[0] for item in chunk]
+        chunk_first_raw = [item[1] for item in chunk]
+        results = extract_grid_batch_with_model(
+            [r.image_path for r in chunk_records],
+            config.model,
+            processor,
+            model,
+            family,
+        )
+        for record, first_raw, (grid, retry_batch_raw) in zip(
+            chunk_records, chunk_first_raw, results
+        ):
+            if grid is not None:
                 result = {
                     "stem": record.stem,
-                    "parse_failed": True,
-                    "raw_text": raw_text,
+                    "parse_failed": False,
+                    "grid": grid.to_dict(),
+                    "recovered_by_batch_retry": True,
                 }
-                failed += 1
-                print(f"    WARNING: parse failed for {record.stem}")
-            out_path = output_dir / f"{record.stem}.json"
-            out_path.write_text(json.dumps(result, indent=2, default=str))
+                succeeded += 1
+                recovered_by_batch_retry += 1
+                out_path = output_dir / f"{record.stem}.json"
+                out_path.write_text(json.dumps(result, indent=2, default=str))
+                print(f"    INFO: recovered parse for {record.stem} via batched retry")
+            else:
+                second_pass_failures.append((record, first_raw, retry_batch_raw))
+
+    if second_pass_failures:
+        print(
+            f"[retry-3] Reprocessing {len(second_pass_failures)} remaining parse failures "
+            f"one-by-one …",
+            flush=True,
+        )
+    for record, first_raw, retry_batch_raw in second_pass_failures:
+        retry_grid, retry_raw = extract_grid_with_model(
+            record.image_path,
+            config.model,
+            processor,
+            model,
+            family,
+        )
+        if retry_grid is not None:
+            result = {
+                "stem": record.stem,
+                "parse_failed": False,
+                "grid": retry_grid.to_dict(),
+                "recovered_by_single_retry": True,
+            }
+            succeeded += 1
+            recovered_by_single_retry += 1
+            print(f"    INFO: recovered parse for {record.stem} via single-image retry")
+        else:
+            result = {
+                "stem": record.stem,
+                "parse_failed": True,
+                "raw_text": first_raw,
+                "retry_batch_raw_text": retry_batch_raw,
+                "retry_raw_text": retry_raw,
+            }
+            failed += 1
+            print(f"    WARNING: parse failed for {record.stem}")
+        out_path = output_dir / f"{record.stem}.json"
+        out_path.write_text(json.dumps(result, indent=2, default=str))
+
+    recovered_by_retry = recovered_by_batch_retry + recovered_by_single_retry
 
     return {
         "total": len(records),
+        "skipped": skipped,
+        "processed": len(records_to_process),
+        "recovered_by_batch_retry": recovered_by_batch_retry,
+        "recovered_by_single_retry": recovered_by_single_retry,
+        "recovered_by_retry": recovered_by_retry,
         "succeeded": succeeded,
         "failed": failed,
         "output_dir": str(output_dir),
