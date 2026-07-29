@@ -5,30 +5,24 @@
 Daily_rainfall_sample/
 outputs/
 fake_daily_rainfall/
-fake_daily_rainfall_2/
 consensus_data/
 test_data/
 logs/
-
 # Documentation
 docs/
 mkdocs.yml
 README.md
-
 # Tests (not needed at runtime)
 tests/
 .pytest_cache/
-
 # Local environment files
 environment.yml
 condaenv.*.requirements.txt
 azureml/config.env
-
 # Dev tooling
 .github/
 .git/
 .vscode/
-
 # Python/local caches
 __pycache__/
 *.py[cod]
@@ -36,3 +30,12 @@ __pycache__/
 .ruff_cache/
 .coverage
 .DS_Store
+# Notebooks (not needed on compute; can be large with embedded outputs)
+notebooks/
+# Temporary / accidental files at repo root
+argparse
+csv
+json
+# Zip archives
+*.zip
+# Large local data not covered above

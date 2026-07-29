@@ -10,8 +10,8 @@
 #   bash scripts/aml_delete.sh <datastore-directory> [--dry-run]
 #
 # Example:
-#   bash scripts/aml_delete.sh fake_daily_rainfall_2
-#   bash scripts/aml_delete.sh fake_daily_rainfall_2/images --dry-run
+#   bash scripts/aml_delete.sh fake_daily_rainfall
+#   bash scripts/aml_delete.sh fake_daily_rainfall/images --dry-run
 
 set -euo pipefail
 
