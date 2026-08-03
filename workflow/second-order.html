@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Second order — fine-tune on consensus &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Operations — run on everything" href="operations.html" />
+    <link rel="prev" title="First order — fine-tune on synthetic data" href="first-order.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="operations.html" title="Operations — run on everything"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="first-order.html" title="First order — fine-tune on synthetic data"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Second order — fine-tune on consensus</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="second-order-fine-tune-on-consensus">
+<h1>Second order — fine-tune on consensus<a class="headerlink" href="#second-order-fine-tune-on-consensus" title="Link to this heading">¶</a></h1>
+<p>The first-order models are good, but they were trained only on synthetic data. To
+improve further we want to fine-tune on <em>real</em> images — but we have no ground-truth
+transcriptions for them. This stage solves that with a <strong>consensus</strong>: where several
+models agree, we trust them, and use that agreement as training truth.</p>
+<p>Three notebooks:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/make_1st_training_consensus.ipynb">make_1st_training_consensus.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/finetune_1st_order_models.ipynb">finetune_1st_order_models.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/validate_2nd_order_real.ipynb">validate_2nd_order_real.ipynb</a></p></li>
+</ul>
+<section id="building-a-consensus-training-set">
+<h2>Building a consensus training set<a class="headerlink" href="#building-a-consensus-training-set" title="Link to this heading">¶</a></h2>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/make_1st_training_consensus.ipynb">make_1st_training_consensus</a>
+notebook runs all five first-order models over ~1000 real images (with no ground
+truth), then builds a consensus: for each cell, where the models agree, that value
+becomes the training label; where they disagree, the cell is left unlabelled. The
+result is a real-image training set whose labels we can trust — not because we
+transcribed them, but because independent models converged on them.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="../_images/consensus_example.png"><img alt="A consensus transcription over a real image" src="../_images/consensus_example.png" style="width: 90%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">A consensus transcription on a real image. Values are kept where the first-order
+models agree, giving a trustworthy training label without any manual
+transcription.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+<section id="fine-tuning-again">
+<h2>Fine-tuning again<a class="headerlink" href="#fine-tuning-again" title="Link to this heading">¶</a></h2>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/finetune_1st_order_models.ipynb">finetune_1st_order_models</a>
+notebook takes each first-order checkpoint and fine-tunes it a second time, now on
+the consensus set of real images. It submits the jobs to Azure ML, waits, discovers
+the new checkpoints, and registers them. These are the “second-order” models.</p>
+</section>
+<section id="the-best-models-yet">
+<h2>The best models yet<a class="headerlink" href="#the-best-models-yet" title="Link to this heading">¶</a></h2>
+<p>Validating the second-order models on the real test set with
+<a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/validate_2nd_order_real.ipynb">validate_2nd_order_real</a>,
+every model improves again — and the weaker ones improve most:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model</p></th>
+<th class="head text-center"><p>First order</p></th>
+<th class="head text-center"><p>Second order</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Granite</p></td>
+<td class="text-center"><p>92%</p></td>
+<td class="text-center"><p><strong>95%</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Ministral</p></td>
+<td class="text-center"><p>85%</p></td>
+<td class="text-center"><p><strong>94%</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>Gemma-3</p></td>
+<td class="text-center"><p>70%</p></td>
+<td class="text-center"><p><strong>90%</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Gemma edge</p></td>
+<td class="text-center"><p>66%</p></td>
+<td class="text-center"><p><strong>89%</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>SmolVLM</p></td>
+<td class="text-center"><p>68%</p></td>
+<td class="text-center"><p><strong>87%</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>Every model is now in the high eighties or better. On our running example, almost
+everything is blue:</p>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="../_images/second_order_example.png"><img alt="Second-order model transcription, nearly all correct" src="../_images/second_order_example.png" style="width: 90%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">The same test image after the second round of fine-tuning on real, consensus-labelled
+data. Nearly every value is now correct (blue).</span><a class="headerlink" href="#id2" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>Requiring agreement between these second-order models in an <em>ensemble</em> pushes the
+usable accuracy higher still — the same trick that carried
+<a class="reference external" href="https://brohan.org/Robot_Rainfall_Rescue/">Robot Rainfall Rescue</a> to
+volunteer-level performance.</p>
+</section>
+<section id="what-you-have-after-this-stage">
+<h2>What you have after this stage<a class="headerlink" href="#what-you-have-after-this-stage" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Second-order (consensus-trained) checkpoints for every model.</p></li>
+<li><p>Real-data accuracy good enough to run in anger.</p></li>
+</ul>
+<p>Next: <a class="reference internal" href="operations.html"><span class="std std-doc">Operations</span></a>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/ADR_logo.png" alt="Logo of Auto Daily Rainfall"/>
+            </a></p>
+<h3><a href="../index.html">Table of Contents</a></h3>
+<p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Workflow overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="preparation.html">Preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="zeroth-order.html">Zeroth order — the baseline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="first-order.html">First order — fine-tune on synthetic data</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Second order — fine-tune on consensus</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations — run on everything</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reproduce.html">How to reproduce and extend</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/workflow/second-order.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="operations.html" title="Operations — run on everything"
+             >next</a></li>
+        <li class="right" >
+          <a href="first-order.html" title="First order — fine-tune on synthetic data"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Second order — fine-tune on consensus</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

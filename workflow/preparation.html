@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Preparation &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Zeroth order — the baseline" href="zeroth-order.html" />
+    <link rel="prev" title="Workflow overview" href="overview.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="zeroth-order.html" title="Zeroth order — the baseline"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="overview.html" title="Workflow overview"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Preparation</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="preparation">
+<h1>Preparation<a class="headerlink" href="#preparation" title="Link to this heading">¶</a></h1>
+<p>Before we can train or measure anything, we need the source images to work on,
+plus two datasets: something to <em>train</em> on, and something to <em>test</em> on. This
+stage builds all three.</p>
+<p>Three notebooks:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/download_document_images.ipynb">download_document_images.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb">make_fake_daily_rainfall_training_data.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb">add_test_data_from_Ciara.ipynb</a></p></li>
+</ul>
+<section id="the-source-document-images">
+<h2>The source document images<a class="headerlink" href="#the-source-document-images" title="Link to this heading">¶</a></h2>
+<p>The raw material is the scanned daily-rainfall registers held by the Met Office
+<a class="reference external" href="https://digital.nmla.metoffice.gov.uk/index.php?name=SO_51194883-b9dd-4e27-93db-958f8fbea38b">National Meteorological Library and Archive</a>
+(published under the Open Government Licence). The archive stores one multi-page
+PDF per county per decade; every page is one station-year rainfall table.</p>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/download_document_images.ipynb">download_document_images</a>
+notebook downloads those PDFs (<code class="docutils literal notranslate"><span class="pre">scripts/download_documents.py</span></code>) and splits them
+into single-page JPEGs (<code class="docutils literal notranslate"><span class="pre">scripts/split_documents.py</span></code>), named like
+<code class="docutils literal notranslate"><span class="pre">DRain_1871-1880_Cornwall-59.jpg</span></code>. Both steps are idempotent and support cluster
+sharding, because the full collection runs to hundreds of gigabytes.</p>
+</section>
+<section id="synthetic-training-data">
+<h2>Synthetic training data<a class="headerlink" href="#synthetic-training-data" title="Link to this heading">¶</a></h2>
+<p>Transcribing images into data is hard — that is the whole problem we are trying to
+solve. But the reverse is easy: given some numbers, we can write a Python program
+that lays them out into an image with the same structure as a real Daily Weather
+Record. So we generate about <strong>1000 fake images</strong> whose values we already know, and
+use them as training data.</p>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb">make_fake_daily_rainfall_training_data</a>
+notebook produces paired <code class="docutils literal notranslate"><span class="pre">images/</span></code> and <code class="docutils literal notranslate"><span class="pre">transcriptions/</span></code> — each image with a JSON
+file holding its exact values. The capabilities the models learn on this synthetic
+data carry over to the real records.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="../_images/sample_document.jpg"><img alt="A real daily rainfall register" src="../_images/sample_document.jpg" style="width: 65%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">A real daily rainfall register. The synthetic images imitate this layout — the same
+day rows, month columns, and monthly totals — so that skills learned on fake data
+transfer to the real thing.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+<section id="real-test-data">
+<h2>Real test data<a class="headerlink" href="#real-test-data" title="Link to this heading">¶</a></h2>
+<p>To know whether the models are actually working, we test them against <em>real</em>
+images with known-good values. <strong>Ciara Ryan</strong> transcribed and quality-controlled
+64 Irish daily rainfall sheets during her PhD; these share the format of the UK
+records we are targeting. Sixty-four images is not enough to train on, but it is
+ideal for validation.</p>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb">add_test_data_from_Ciara</a>
+notebook reformats her results into the project’s <code class="docutils literal notranslate"><span class="pre">images/</span></code> + <code class="docutils literal notranslate"><span class="pre">transcriptions/</span></code>
+layout, giving a trustworthy real-data test set that every later stage measures
+against.</p>
+</section>
+<section id="what-you-have-after-this-stage">
+<h2>What you have after this stage<a class="headerlink" href="#what-you-have-after-this-stage" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>The real archive document images, split into per-page JPEGs.</p></li>
+<li><p>~1000 synthetic training images with perfect labels.</p></li>
+<li><p>64 real test images with hand-checked ground truth.</p></li>
+</ul>
+<p>Next: measure the raw models against both, in <a class="reference internal" href="zeroth-order.html"><span class="std std-doc">Zeroth order</span></a>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/ADR_logo.png" alt="Logo of Auto Daily Rainfall"/>
+            </a></p>
+<h3><a href="../index.html">Table of Contents</a></h3>
+<p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Workflow overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="zeroth-order.html">Zeroth order — the baseline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="first-order.html">First order — fine-tune on synthetic data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="second-order.html">Second order — fine-tune on consensus</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations — run on everything</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reproduce.html">How to reproduce and extend</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/workflow/preparation.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="zeroth-order.html" title="Zeroth order — the baseline"
+             >next</a></li>
+        <li class="right" >
+          <a href="overview.html" title="Workflow overview"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Preparation</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

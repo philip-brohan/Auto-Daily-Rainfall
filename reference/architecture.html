@@ -12,14 +12,18 @@
     <script src="../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="HPC and Azure ML" href="azure.html" />
     <link rel="prev" title="Configuration Reference" href="configuration.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="Related">
       <h3>Navigation</h3>
       <ul>
         <li class="right" style="margin-right: 10px">
+          <a href="azure.html" title="HPC and Azure ML"
+             accesskey="N">next</a></li>
+        <li class="right" >
           <a href="configuration.html" title="Configuration Reference"
-             accesskey="P">previous</a></li>
+             accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Architecture</a></li> 
       </ul>
@@ -126,25 +130,30 @@ file.  Tests avoid loading real models by mocking <code class="docutils literal 
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/ADR_logo.png" alt="Logo of Auto Daily Rainfall"/>
+            </a></p>
 <h3><a href="../index.html">Table of Contents</a></h3>
-<ul class="current">
+<p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guide/ingest.html">Data Ingest</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guide/extraction.html">Extraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guide/finetuning.html">Fine-tuning</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guide/evaluation.html">Evaluation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guide/visualisation.html">Visualisation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../guide/hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow/overview.html">Workflow overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../workflow/preparation.html">Preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow/zeroth-order.html">Zeroth order — the baseline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow/first-order.html">First order — fine-tune on synthetic data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow/second-order.html">Second order — fine-tune on consensus</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow/operations.html">Operations — run on everything</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="cli.html">CLI Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration Reference</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Architecture</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#module-overview">Module overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#data-flow">Data flow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#key-design-decisions">Key design decisions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#testing">Testing</a></li>
-</ul>
-</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reproduce.html">How to reproduce and extend</a></li>
 </ul>
 
   <div role="note" aria-label="source link">
@@ -162,8 +171,11 @@ file.  Tests avoid loading real models by mocking <code class="docutils literal 
       <h3>Navigation</h3>
       <ul>
         <li class="right" style="margin-right: 10px">
+          <a href="azure.html" title="HPC and Azure ML"
+             >next</a></li>
+        <li class="right" >
           <a href="configuration.html" title="Configuration Reference"
-             >previous</a></li>
+             >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Architecture</a></li> 
       </ul>

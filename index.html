@@ -32,113 +32,106 @@
             
   <section id="auto-daily-rainfall">
 <h1>Auto Daily Rainfall<a class="headerlink" href="#auto-daily-rainfall" title="Link to this heading">¶</a></h1>
-<p><strong>Automated extraction of daily rainfall data from scanned historical documents
-using small, locally-run vision-language models.</strong></p>
+<p><strong>Rescuing daily rainfall observations from historical documents, using small
+vision-language models instead of thousands of human volunteers.</strong></p>
 <hr class="docutils" />
-<section id="what-this-project-does">
-<h2>What this project does<a class="headerlink" href="#what-this-project-does" title="Link to this heading">¶</a></h2>
-<p>Meteorological archives contain millions of handwritten and typed daily rainfall
-registers stretching back over a century.  This project uses small
-<a class="reference external" href="https://huggingface.co/models?pipeline_tag=image-text-to-text">vision-language models (VLMs)</a>
-from Hugging Face to read those document images and output structured JSON — no
-cloud API required.</p>
-<p>The pipeline has three stages:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Scanned document images
-       │
-       ▼
-  1. Ingest          — pair images with human transcriptions
-       │
-       ▼
-  2. Extract         — run a VLM over each image → JSON grid
-       │
-       ▼
-  3. Evaluate / Fine-tune — measure accuracy; improve the model with LoRA
-</pre></div>
+<p>The <a class="reference external" href="https://climatelabbook.substack.com/p/rainfall-rescue-5-years-on">Rainfall Rescue project</a>
+showed that historical weather records could be recovered from paper archives by
+an army of volunteers. Its successor,
+<a class="reference external" href="https://brohan.org/Robot_Rainfall_Rescue/">Robot Rainfall Rescue</a>, showed that
+an ensemble of small <a class="reference external" href="https://huggingface.co/blog/vlms">vision-language models (VLMs)</a>
+could do the same job for the <em>monthly</em> rainfall sheets — matching volunteer
+accuracy without recruiting, training, and managing anyone.</p>
+<p>This project applies that approach to the far larger and harder collection of
+<strong>daily</strong> rainfall registers: about <strong>660,000</strong> scanned station-year images, each
+a dense grid of daily rainfall totals. Success means converting every image into
+a structured table of numbers that can be ingested into a database.</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="_images/sample_document.jpg"><img alt="A scanned daily rainfall register" src="_images/sample_document.jpg" style="width: 70%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">A single scanned daily rainfall register. Each image holds one station’s daily
+rainfall totals (mm) — rows for days 1–31, columns for the months, plus monthly
+totals. The task is to turn this into a table of numbers.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+<section id="the-approach">
+<h2>The approach<a class="headerlink" href="#the-approach" title="Link to this heading">¶</a></h2>
+<p>We don’t try to impose our own structure on the problem. Instead we take small,
+open-weight VLMs, fine-tune them on the rainfall task, and let them read the
+images directly into JSON. The work proceeds in staged rounds, and — importantly —
+<strong>each round is driven by a notebook</strong> that you can open, read, and run.</p>
+<ol class="arabic simple">
+<li><p><strong>Preparation</strong> — generate synthetic training data with known values, and
+import a small hand-transcribed test set for validation.</p></li>
+<li><p><strong>Zeroth order</strong> — measure the raw, un-fine-tuned models to establish a
+baseline.</p></li>
+<li><p><strong>First order</strong> — fine-tune every model on the synthetic data and re-measure.</p></li>
+<li><p><strong>Second order</strong> — build a <em>consensus</em> training set from where the first-order
+models agree on real images, fine-tune again on that, and re-measure.</p></li>
+<li><p><strong>Operations</strong> — run the finished ensemble over the full 660,000-image
+dataset.</p></li>
+</ol>
+<p>The <a class="reference internal" href="workflow/overview.html"><span class="std std-doc">workflow overview</span></a> explains how the notebooks fit
+together; the pages under it walk through each stage.</p>
+</section>
+<section id="does-it-work">
+<h2>Does it work?<a class="headerlink" href="#does-it-work" title="Link to this heading">¶</a></h2>
+<p>Yes. Measured on 64 real, hand-transcribed images (Ciara Ryan’s Irish daily
+rainfall sheets), the models improve dramatically across the rounds:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model</p></th>
+<th class="head text-center"><p>Zeroth order (raw)</p></th>
+<th class="head text-center"><p>First order (fake)</p></th>
+<th class="head text-center"><p>Second order (consensus)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Granite</p></td>
+<td class="text-center"><p>46%</p></td>
+<td class="text-center"><p>92%</p></td>
+<td class="text-center"><p><strong>95%</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Ministral</p></td>
+<td class="text-center"><p>62%</p></td>
+<td class="text-center"><p>85%</p></td>
+<td class="text-center"><p><strong>94%</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>Gemma-3</p></td>
+<td class="text-center"><p>21%</p></td>
+<td class="text-center"><p>70%</p></td>
+<td class="text-center"><p><strong>90%</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Gemma edge</p></td>
+<td class="text-center"><p>39%</p></td>
+<td class="text-center"><p>66%</p></td>
+<td class="text-center"><p><strong>89%</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>SmolVLM</p></td>
+<td class="text-center"><p>32%</p></td>
+<td class="text-center"><p>68%</p></td>
+<td class="text-center"><p><strong>87%</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p><em>Per-cell accuracy against hand-transcribed ground truth.</em></p>
+<p>The raw models are hopeless — the best gets under two thirds of the values right.
+After two rounds of fine-tuning, every model is in the high eighties or better,
+and an ensemble that requires agreement between models does better still. As with
+the monthly sheets, this is comparable to human volunteers, and it scales.</p>
+</section>
+<section id="get-started">
+<h2>Get started<a class="headerlink" href="#get-started" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="installation.html"><span class="std std-doc">Installation</span></a> — set up the environment.</p></li>
+<li><p><a class="reference internal" href="workflow/overview.html"><span class="std std-doc">Workflow overview</span></a> — the staged, notebook-driven pipeline.</p></li>
+<li><p><a class="reference internal" href="reproduce.html"><span class="std std-doc">How to reproduce and extend</span></a> — code, compute, and credits.</p></li>
+</ul>
+<div class="toctree-wrapper compound">
 </div>
-</section>
-<section id="sample-document">
-<h2>Sample document<a class="headerlink" href="#sample-document" title="Link to this heading">¶</a></h2>
-<p>The repository ships with a small set of sample images from the
-<code class="docutils literal notranslate"><span class="pre">Daily_rainfall_sample/</span></code> directory.  Each image is a monthly grid of daily
-rainfall totals (mm) for a single UK station:</p>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Column</p></th>
-<th class="head"><p>Contents</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>Rows</p></td>
-<td><p>Day 1 – Day 31</p></td>
-</tr>
-<tr class="row-odd"><td><p>Columns</p></td>
-<td><p>Jan – Dec</p></td>
-</tr>
-<tr class="row-even"><td><p>Extra row</p></td>
-<td><p>Monthly totals</p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="supported-models">
-<h2>Supported models<a class="headerlink" href="#supported-models" title="Link to this heading">¶</a></h2>
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Short name</p></th>
-<th class="head"><p>HuggingFace ID</p></th>
-<th class="head"><p>Size</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">smolvlm</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">HuggingFaceTB/SmolVLM-500M-Instruct</span></code></p></td>
-<td><p>500 M</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">smolvlm2</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">HuggingFaceTB/SmolVLM2-2.2B-Instruct</span></code></p></td>
-<td><p>2.2 B</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">granite</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">ibm-granite/granite-vision-3.2-2b</span></code></p></td>
-<td><p>2 B</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">granite4</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">ibm-granite/granite-vision-4.1-4b</span></code></p></td>
-<td><p>4 B</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gemma3</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">google/gemma-3-4b-it</span></code></p></td>
-<td><p>4 B</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gemma4</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">google/gemma-4-E4B-it</span></code></p></td>
-<td><p>4 B edge</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ministral</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">mistralai/Mistral-Small-3.1-24B-Instruct-2503</span></code></p></td>
-<td><p>24 B</p></td>
-</tr>
-</tbody>
-</table>
-<p>Any HuggingFace model ID can be passed directly with <code class="docutils literal notranslate"><span class="pre">--model</span></code>.
-Gated models (Gemma, Mistral) require a HuggingFace token set via <code class="docutils literal notranslate"><span class="pre">HF_TOKEN</span></code>.</p>
-</section>
-<section id="key-features">
-<h2>Key features<a class="headerlink" href="#key-features" title="Link to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><strong>Runs locally</strong> — models are downloaded once and cached by HuggingFace.</p></li>
-<li><p><strong>LoRA fine-tuning</strong> — improve extraction quality with your own transcribed data in a few hours on a single GPU.</p></li>
-<li><p><strong>Adapter loading</strong> — pass a fine-tuned adapter directory as <code class="docutils literal notranslate"><span class="pre">--model</span></code> and it loads automatically.</p></li>
-<li><p><strong>Diagnostic figures</strong> — side-by-side image / extracted-table visualisation with blue/red cell colouring against ground truth.</p></li>
-</ul>
-</section>
-<section id="quick-links">
-<h2>Quick links<a class="headerlink" href="#quick-links" title="Link to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="installation.html"><span class="std std-doc">Installation</span></a></p></li>
-<li><p><a class="reference internal" href="quickstart.html"><span class="std std-doc">Quick start</span></a></p></li>
-<li><p><a class="reference internal" href="reference/cli.html"><span class="std std-doc">CLI reference</span></a></p></li>
-</ul>
+<div class="toctree-wrapper compound">
+</div>
 <div class="toctree-wrapper compound">
 </div>
 </section>
@@ -151,19 +144,30 @@ Gated models (Gemma, Mistral) require a HuggingFace token set via <code class="d
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="#">
+              <img class="logo" src="_static/ADR_logo.png" alt="Logo of Auto Daily Rainfall"/>
+            </a></p>
 <h3><a href="#">Table of Contents</a></h3>
+<p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guide/ingest.html">Data Ingest</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guide/extraction.html">Extraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guide/finetuning.html">Fine-tuning</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guide/evaluation.html">Evaluation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guide/visualisation.html">Visualisation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="guide/hpc-azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow/overview.html">Workflow overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="workflow/preparation.html">Preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow/zeroth-order.html">Zeroth order — the baseline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow/first-order.html">First order — fine-tune on synthetic data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow/second-order.html">Second order — fine-tune on consensus</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow/operations.html">Operations — run on everything</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="reference/cli.html">CLI Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/configuration.html">Configuration Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reproduce.html">How to reproduce and extend</a></li>
 </ul>
 
   <div role="note" aria-label="source link">

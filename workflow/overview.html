@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Workflow overview &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Preparation" href="preparation.html" />
+    <link rel="prev" title="Installation" href="../installation.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="preparation.html" title="Preparation"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="../installation.html" title="Installation"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Workflow overview</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="workflow-overview">
+<h1>Workflow overview<a class="headerlink" href="#workflow-overview" title="Link to this heading">¶</a></h1>
+<p>From a user’s point of view, the whole project is controlled through a series of
+<a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/tree/main/notebooks">Jupyter notebooks</a>.
+Each notebook documents and drives one stage of the pipeline: it submits the heavy
+work to <a class="reference internal" href="../reference/azure.html"><span class="std std-doc">Azure ML</span></a>, waits for the jobs, downloads the
+results, and produces validation summaries. To reproduce or extend the project, you
+open the notebooks and run them in order.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Run every notebook in the <code class="docutils literal notranslate"><span class="pre">weather-doc-extractor</span></code> Conda environment
+(<code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span> <span class="pre">weather-doc-extractor</span></code>). See <a class="reference internal" href="../installation.html"><span class="std std-doc">Installation</span></a>.</p>
+</div>
+<section id="the-stages">
+<h2>The stages<a class="headerlink" href="#the-stages" title="Link to this heading">¶</a></h2>
+<p>The notebooks are grouped into stages, run top to bottom:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>preparation/          Download the source images, build synthetic training
+      │               data, and import the real test set
+      ▼
+zeroth_order/         Measure the raw, un-fine-tuned models  (baseline)
+      │
+      ▼
+first_order/          Fine-tune on synthetic data, then re-measure
+      │
+      ▼
+second_order/         Build a consensus set from real images, fine-tune again,
+      │               then re-measure
+      ▼
+operations/           Run the finished ensemble over the full dataset
+</pre></div>
+</div>
+<p>Two ideas run through the whole workflow:</p>
+<ul class="simple">
+<li><p><strong>Fake data for training, real data for testing.</strong> We can cheaply generate
+synthetic images whose values we know, and use them to teach the models the
+task. We keep a small, precious set of hand-transcribed <em>real</em> images
+(from <a class="reference internal" href="../reproduce.html#credits-and-acknowledgements"><span class="std std-ref">Ciara Ryan</span></a>) purely for
+validation, so every accuracy number is measured against genuine records.</p></li>
+<li><p><strong>Consensus instead of ground truth.</strong> We have no transcriptions for the real
+images, so we can’t fine-tune on them directly. Instead we run several models,
+keep the cells where they <em>agree</em>, and treat that agreement as training truth
+for a second round of fine-tuning.</p></li>
+</ul>
+</section>
+<section id="the-notebooks-in-order">
+<h2>The notebooks, in order<a class="headerlink" href="#the-notebooks-in-order" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Stage</p></th>
+<th class="head"><p>Notebook</p></th>
+<th class="head"><p>What it does</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Preparation</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/download_document_images.ipynb">download_document_images</a></p></td>
+<td><p>Download the archive PDFs and split them into per-page images</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Preparation</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb">make_fake_daily_rainfall_training_data</a></p></td>
+<td><p>Generate ~1000 synthetic images with known values</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Preparation</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb">add_test_data_from_Ciara</a></p></td>
+<td><p>Import the 64-image hand-transcribed test set</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>Zeroth order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/zeroth_order/validate_0th_order_fake.ipynb">validate_0th_order_fake</a></p></td>
+<td><p>Baseline of raw models on fake data</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Zeroth order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/zeroth_order/validate_0th_order_real.ipynb">validate_0th_order_real</a></p></td>
+<td><p>Baseline of raw models on real data</p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p>First order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/first_order/finetune_original_models.ipynb">finetune_original_models</a></p></td>
+<td><p>Fine-tune all models on the synthetic data</p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p>First order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/first_order/validate_1st_order_fake.ipynb">validate_1st_order_fake</a></p></td>
+<td><p>First-order models on fake data</p></td>
+</tr>
+<tr class="row-odd"><td><p>8</p></td>
+<td><p>First order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/first_order/validate_1st_order_real.ipynb">validate_1st_order_real</a></p></td>
+<td><p>First-order models on real data</p></td>
+</tr>
+<tr class="row-even"><td><p>9</p></td>
+<td><p>Second order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/make_1st_training_consensus.ipynb">make_1st_training_consensus</a></p></td>
+<td><p>Build the consensus training set from real images</p></td>
+</tr>
+<tr class="row-odd"><td><p>10</p></td>
+<td><p>Second order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/finetune_1st_order_models.ipynb">finetune_1st_order_models</a></p></td>
+<td><p>Fine-tune again on the consensus set</p></td>
+</tr>
+<tr class="row-even"><td><p>11</p></td>
+<td><p>Second order</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/validate_2nd_order_real.ipynb">validate_2nd_order_real</a></p></td>
+<td><p>Second-order models on real data</p></td>
+</tr>
+<tr class="row-odd"><td><p>12</p></td>
+<td><p>Operations</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/operations/run_operational_extractions_sample.ipynb">run_operational_extractions_sample</a></p></td>
+<td><p>Ensemble extraction on a large sample</p></td>
+</tr>
+<tr class="row-even"><td><p>13</p></td>
+<td><p>Operations</p></td>
+<td><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/operations/run_operational_extractions_all.ipynb">run_operational_extractions_all</a></p></td>
+<td><p>Ensemble extraction on all ~660,000 images</p></td>
+</tr>
+</tbody>
+</table>
+<p>Work through the stage pages next, starting with <a class="reference internal" href="preparation.html"><span class="std std-doc">Preparation</span></a>.</p>
+</section>
+<section id="reading-the-validation-figures">
+<h2>Reading the validation figures<a class="headerlink" href="#reading-the-validation-figures" title="Link to this heading">¶</a></h2>
+<p>The validation notebooks produce a comparison figure for each test image: the
+scanned document on the left, and the model’s transcription laid over the table
+grid. Numbers in <strong>blue</strong> match the ground truth; numbers in <strong>red</strong> are wrong.
+These figures appear throughout the stage pages that follow, and make the effect
+of each round of fine-tuning immediately visible.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/ADR_logo.png" alt="Logo of Auto Daily Rainfall"/>
+            </a></p>
+<h3><a href="../index.html">Table of Contents</a></h3>
+<p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Workflow overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-stages">The stages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-notebooks-in-order">The notebooks, in order</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reading-the-validation-figures">Reading the validation figures</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="preparation.html">Preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="zeroth-order.html">Zeroth order — the baseline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="first-order.html">First order — fine-tune on synthetic data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="second-order.html">Second order — fine-tune on consensus</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations — run on everything</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reproduce.html">How to reproduce and extend</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/workflow/overview.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="preparation.html" title="Preparation"
+             >next</a></li>
+        <li class="right" >
+          <a href="../installation.html" title="Installation"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Workflow overview</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>

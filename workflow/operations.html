@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Operations — run on everything &#8212; Auto Daily Rainfall</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d75fae25" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinxdoc.css?v=34905f61" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="CLI Reference" href="../reference/cli.html" />
+    <link rel="prev" title="Second order — fine-tune on consensus" href="second-order.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../reference/cli.html" title="CLI Reference"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="second-order.html" title="Second order — fine-tune on consensus"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Operations — run on everything</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="operations-run-on-everything">
+<h1>Operations — run on everything<a class="headerlink" href="#operations-run-on-everything" title="Link to this heading">¶</a></h1>
+<p>The transcription models are now good enough. Time to put them to use: run the
+ensemble over the full collection of scanned images and produce the rescued data.</p>
+<p>Two notebooks:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/operations/run_operational_extractions_sample.ipynb">run_operational_extractions_sample.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/operations/run_operational_extractions_all.ipynb">run_operational_extractions_all.ipynb</a></p></li>
+</ul>
+<section id="start-with-a-large-sample">
+<h2>Start with a large sample<a class="headerlink" href="#start-with-a-large-sample" title="Link to this heading">¶</a></h2>
+<p>Before committing to the full dataset, the
+<a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/operations/run_operational_extractions_sample.ipynb">run_operational_extractions_sample</a>
+notebook runs the second-order ensemble over a large sample of images. This
+exercises the operational path at scale — batching, Azure ML job submission, and
+result collection — and confirms the pipeline behaves before the full run.</p>
+</section>
+<section id="then-run-everything">
+<h2>Then run everything<a class="headerlink" href="#then-run-everything" title="Link to this heading">¶</a></h2>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/operations/run_operational_extractions_all.ipynb">run_operational_extractions_all</a>
+notebook applies the ensemble to the whole collection — about <strong>660,000</strong> images.
+Each image is independent, so the extraction is embarrassingly parallel and runs as
+GPU job arrays on <a class="reference internal" href="../reference/azure.html"><span class="std std-doc">Azure ML</span></a>. The output is one structured
+JSON transcription per image, ready for ingestion into a database.</p>
+<p>Requiring agreement between models in the ensemble gives both a best-estimate value
+and a built-in confidence signal: cells where the models agree are highly reliable,
+and cells where they disagree can be flagged for review.</p>
+</section>
+<section id="what-you-have-after-this-stage">
+<h2>What you have after this stage<a class="headerlink" href="#what-you-have-after-this-stage" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Structured rainfall transcriptions for the full image collection.</p></li>
+<li><p>A repeatable, scalable process that can be re-run on new archives on demand.</p></li>
+</ul>
+<p>For the compute setup behind these runs, see <a class="reference internal" href="../reference/azure.html"><span class="std std-doc">Azure ML</span></a>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/ADR_logo.png" alt="Logo of Auto Daily Rainfall"/>
+            </a></p>
+<h3><a href="../index.html">Table of Contents</a></h3>
+<p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Workflow overview</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="preparation.html">Preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="zeroth-order.html">Zeroth order — the baseline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="first-order.html">First order — fine-tune on synthetic data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="second-order.html">Second order — fine-tune on consensus</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Operations — run on everything</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/azure.html">HPC and Azure ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reproduce.html">How to reproduce and extend</a></li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/workflow/operations.md.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../reference/cli.html" title="CLI Reference"
+             >next</a></li>
+        <li class="right" >
+          <a href="second-order.html" title="Second order — fine-tune on consensus"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Operations — run on everything</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    </div>
+  </body>
+</html>
