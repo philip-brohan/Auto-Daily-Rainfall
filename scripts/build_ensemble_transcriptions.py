@@ -1,23 +1,33 @@
 #!/usr/bin/env python3
-"""Build ensemble transcriptions from extraction directories.
+"""Build ensemble transcriptions from an extraction directory tree.
+
+Recursively searches --input-dir for *.json extraction files, groups them by
+stem (filename without extension), and writes one ensemble file per stem to
+--output-dir.
 
 Each output cell is:
   {"values": [<float|null|"missing">, ...]}
 
-with one entry per input directory (in the order given), preserving each
-model's raw value (normalized to the requested precision).
-  - null means the model read the cell as blank (positive information)
-  - "missing" means the model's extraction file was absent or unparseable
+with one entry per extraction file found for that stem, in discovery order.
+  - null means the extractor read the cell as blank (positive information)
+  - "missing" means the file was found but could not be parsed
+
+Typically, each stem appears in exactly N extraction files (one per model run),
+so the values array has N entries without any bookkeeping about batches or models.
 
 Usage:
     conda activate weather-doc-extractor
     python scripts/build_ensemble_transcriptions.py \
+        --input-dir /path/to/individual_transcriptions \
+        --output-dir /path/to/ensemble_transcriptions \
+        [--precision 3] \
+        [--summary-file /path/to/ensemble_summary.json]
+
+    # Multiple input dirs are searched together:
+    python scripts/build_ensemble_transcriptions.py \
         --input-dir outputs/extractions/run_a \
         --input-dir outputs/extractions/run_b \
-        --input-dir outputs/extractions/run_c \
-        --output-dir outputs/ensemble/my_run \
-        [--precision 3] \
-        [--summary-file outputs/ensemble/my_run/ensemble_summary.json]
+        --output-dir outputs/ensemble/my_run
 
     # Or drive from a consensus_config.json (same format as
     # build_consensus_transcriptions.py):
@@ -48,21 +58,12 @@ def _normalize_value(v: Any, precision: int) -> float | None:
         return None
 
 
-# Sentinel for a model whose extraction file was absent or failed to parse.
-# Distinct from None/null, which means the model read the cell as blank.
+# Sentinel for a file that was found but could not be parsed.
+# Distinct from None/null, which means the extractor read the cell as blank.
 MISSING: str = "missing"
 
 
-def _empty_ensemble(n_models: int) -> dict[str, list[dict[str, Any]]]:
-    out: dict[str, list[dict[str, Any]]] = {}
-    for key in ALL_KEYS:
-        out[key] = [{"values": [MISSING] * n_models} for _ in range(12)]
-    return out
-
-
 def _load_extraction(path: Path) -> dict[str, Any] | None:
-    if not path.exists():
-        return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
@@ -100,17 +101,18 @@ def _get_row(grid: dict[str, Any], key: str) -> list[Any] | None:
     return None
 
 
-def _collect_stems(input_dirs: list[Path]) -> set[str]:
-    stems: set[str] = set()
+def _discover_stem_files(input_dirs: list[Path]) -> dict[str, list[Path]]:
+    """Recursively find all *.json files and group by stem."""
+    stem_files: dict[str, list[Path]] = {}
     for d in input_dirs:
-        for p in d.glob("*.json"):
-            stems.add(p.stem)
-    return stems
+        for p in sorted(d.rglob("*.json")):
+            stem_files.setdefault(p.stem, []).append(p)
+    return stem_files
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build ensemble transcriptions from multiple extraction directories",
+        description="Build ensemble transcriptions from an extraction directory tree",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__.split("\n\n", 1)[1],
     )
@@ -125,7 +127,8 @@ def parse_args() -> argparse.Namespace:
         action="append",
         dest="input_dirs",
         default=None,
-        help="Model extraction directory (repeat for each model). "
+        help="Directory to search recursively for extraction JSON files "
+        "(repeat to include multiple directories). "
         "Required if --config-file not provided.",
     )
     parser.add_argument(
@@ -168,7 +171,7 @@ def main() -> None:
         except json.JSONDecodeError as e:
             raise SystemExit(f"Failed to parse config file: {config_file}: {e}")
 
-    # Resolve input directories: from config or CLI
+    # Resolve input directories
     if config_data is not None:
         input_dirs = [Path(d).resolve() for d in config_data.get("extraction_dirs", [])]
     elif args.input_dirs is not None:
@@ -208,37 +211,32 @@ def main() -> None:
         if not d.exists():
             raise SystemExit(f"Input dir not found: {d}")
 
-    n_models = len(input_dirs)
-    stems = sorted(_collect_stems(input_dirs))
-    if not stems:
+    print(
+        f"Discovering extraction files in {[str(d) for d in input_dirs]} ...",
+        flush=True,
+    )
+    stem_files = _discover_stem_files(input_dirs)
+    if not stem_files:
         raise SystemExit("No extraction JSON files found in input directories")
 
-    stats = {
-        "total_stems": len(stems),
+    print(f"Found {len(stem_files)} stems.", flush=True)
+
+    stats: dict[str, Any] = {
+        "total_stems": len(stem_files),
         "total_cells": 0,
         "fully_present_cells": 0,
         "partial_cells": 0,
         "empty_cells": 0,
-        "missing_model_files": 0,
         "parse_failed_or_invalid": 0,
-        "n_models": n_models,
         "input_dirs": [str(d) for d in input_dirs],
         "precision": precision,
     }
 
-    for stem in stems:
-        # True None means the file existed but the grid couldn't be read;
-        # we use the MISSING sentinel in output to distinguish from null (blank cell).
+    for stem, files in sorted(stem_files.items()):
         grids: list[dict[str, Any] | None] = []
         available: list[bool] = []
-        for d in input_dirs:
-            p = d / f"{stem}.json"
-            if not p.exists():
-                stats["missing_model_files"] += 1
-                grids.append(None)
-                available.append(False)
-                continue
-            grid = _load_extraction(p)
+        for f in files:
+            grid = _load_extraction(f)
             if grid is None:
                 stats["parse_failed_or_invalid"] += 1
                 available.append(False)
@@ -246,13 +244,15 @@ def main() -> None:
                 available.append(True)
             grids.append(grid)
 
-        ensemble = _empty_ensemble(n_models)
+        n_found = len(grids)
+        ensemble: dict[str, list[dict[str, Any]]] = {}
 
         for key in ALL_KEYS:
+            month_entries = []
             for month_idx in range(12):
                 values: list[float | None | str] = []
-                for model_idx, grid in enumerate(grids):
-                    if not available[model_idx]:
+                for idx, grid in enumerate(grids):
+                    if not available[idx]:
                         values.append(MISSING)
                         continue
                     row = _get_row(grid, key)
@@ -261,16 +261,18 @@ def main() -> None:
                         continue
                     values.append(_normalize_value(row[month_idx], precision))
 
-                ensemble[key][month_idx] = {"values": values}
+                month_entries.append({"values": values})
 
                 n_present = sum(1 for v in values if v != MISSING)
                 stats["total_cells"] += 1
-                if n_present == n_models:
+                if n_present == n_found:
                     stats["fully_present_cells"] += 1
                 elif n_present > 0:
                     stats["partial_cells"] += 1
                 else:
                     stats["empty_cells"] += 1
+
+            ensemble[key] = month_entries
 
         out_file = output_dir / f"{stem}.json"
         out_file.write_text(json.dumps(ensemble, indent=2), encoding="utf-8")

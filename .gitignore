@@ -6,6 +6,7 @@ __pycache__/
 .venv/
 dist/
 build/
+logs/
 docs/_build/
 azureml/config.env
 
@@ -17,3 +18,7 @@ test_data/fake/
 consensus_data/
 # Ignore model outputs
 outputs/
+
+# Linked in scratch  space
+/data/scratch/
+

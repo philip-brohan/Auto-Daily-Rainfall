@@ -189,7 +189,7 @@ to extract data from new, unannotated images.
 
 Each file contains:
 
-```json
+```text
 {
   "stem": "DRain_1871-1880_Cornwall-59",
   "parse_failed": false,

@@ -8,6 +8,8 @@ dependencies:
   - matplotlib
   - nbformat
   - ipykernel
+  - sphinx
+  - myst-parser
   - pip:
       - -e .
       - accelerate
