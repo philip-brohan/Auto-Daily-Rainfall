@@ -6,15 +6,15 @@ re-measure. These fine-tuned checkpoints are the "first-order" models.
 
 Three notebooks:
 
-- [finetune_original_models.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/first_order/finetune_original_models.ipynb)
-- [validate_1st_order_fake.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/first_order/validate_1st_order_fake.ipynb)
-- [validate_1st_order_real.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/first_order/validate_1st_order_real.ipynb)
+- [finetune_original_models.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/first_order/finetune_original_models.ipynb) fine-tunes the model on synthetic data
+- [validate_1st_order_fake.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/first_order/validate_1st_order_fake.ipynb) tests the fine-tuned models on synthetic data
+- [validate_1st_order_real.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/first_order/validate_1st_order_real.ipynb) tests the fine-tuned models on real data
 
 ## Fine-tuning
 
-The [finetune_original_models](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/first_order/finetune_original_models.ipynb)
+The [finetune_original_models](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/first_order/finetune_original_models.ipynb)
 notebook submits a fine-tuning job to Azure ML for each model (SmolVLM, Granite,
-Gemma, Ministral), waits for them to finish, auto-discovers the resulting
+Gemma, gemma, Ministral), waits for them to finish, auto-discovers the resulting
 checkpoints in the [model registry](../reference/architecture.md), and lists them
 for use in the validation notebooks. Because the models are small and the training
 set is small, each run is quick and cheap.
@@ -34,14 +34,13 @@ above its baseline:
 
 Note that the models were fine-tuned only on *synthetic* data, yet they improve
 sharply on *real* images — the task skills transfer. On the same image we saw at
-baseline, most of the red has turned blue:
+baseline, many more cells have turned dark blue (the colour of success, where we think we are right - because we have inter-model consensus - and we are right):
 
 ```{figure} ../_static/figures/first_order_example.png
 :alt: First-order model transcription, much improved
 :width: 90%
 
-The same test image after one round of fine-tuning on synthetic data. Far fewer
-errors (red) than the raw model.
+The same test image after one round of fine-tuning on synthetic data. Many more successes (dark blue) than the raw model.
 ```
 
 The best model is now over 90%, but the weaker ones are still in the sixties and

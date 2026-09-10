@@ -7,13 +7,13 @@ models agree, we trust them, and use that agreement as training truth.
 
 Three notebooks:
 
-- [make_1st_training_consensus.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/make_1st_training_consensus.ipynb)
-- [finetune_1st_order_models.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/finetune_1st_order_models.ipynb)
-- [validate_2nd_order_real.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/validate_2nd_order_real.ipynb)
+- [make_1st_training_consensus.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/second_order/make_1st_training_consensus.ipynb)
+- [finetune_1st_order_models.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/second_order/finetune_1st_order_models.ipynb)
+- [validate_2nd_order_real.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/second_order/validate_2nd_order_real.ipynb)
 
 ## Building a consensus training set
 
-The [make_1st_training_consensus](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/make_1st_training_consensus.ipynb)
+The [make_1st_training_consensus](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/second_order/make_1st_training_consensus.ipynb)
 notebook runs all five first-order models over ~1000 real images (with no ground
 truth), then builds a consensus: for each cell, where the models agree, that value
 becomes the training label; where they disagree, the cell is left unlabelled. The
@@ -31,7 +31,7 @@ transcription.
 
 ## Fine-tuning again
 
-The [finetune_1st_order_models](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/finetune_1st_order_models.ipynb)
+The [finetune_1st_order_models](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/second_order/finetune_1st_order_models.ipynb)
 notebook takes each first-order checkpoint and fine-tunes it a second time, now on
 the consensus set of real images. It submits the jobs to Azure ML, waits, discovers
 the new checkpoints, and registers them. These are the "second-order" models.
@@ -39,7 +39,7 @@ the new checkpoints, and registers them. These are the "second-order" models.
 ## The best models yet
 
 Validating the second-order models on the real test set with
-[validate_2nd_order_real](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/second_order/validate_2nd_order_real.ipynb),
+[validate_2nd_order_real](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/second_order/validate_2nd_order_real.ipynb),
 every model improves again — and the weaker ones improve most:
 
 | Model | First order | Second order |

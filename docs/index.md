@@ -1,20 +1,16 @@
 # Auto Daily Rainfall
 
-**Rescuing daily rainfall observations from historical documents, using small
-vision-language models instead of thousands of human volunteers.**
+This is the second in a set of three projects demonstrating a 100% AI method to do large-scale [Climate Data Rescue](https://climate.copernicus.eu/sites/default/files/2020-02/BestPracticeGuidelines_ClimateDataRescue_0.pdf):
+
+- **[Robot Rainfall Rescue](https://brohan.org/Robot_Rainfall_Rescue/)** demonstrated the basic approach: How to fine-tune an ensemble of small Vision Language Models to convert a large collection of photographs of historical documents containing numerical weather records into computer-readable form.
+- **This Project** applies the approach to the 660,000 pages of the UK Daily Rainfall Reports (England and Wales). It demonstrates fine-tuning without any training data, and produces a full ensemble transcription.
+- **[Auto Daily Rainfall QC](https://brohan.org/Auto-Daily-Rainfall-QC/)** takes the raw transcriptions, applies metadata (locations and dates), does basic QC and deduplication, and outputs [73 million daily rainfall observations](https://doi.org/10.5281/zenodo.21905160) as ready-to-use [Station Exchange Format (SEF)](https://datarescue.climate.copernicus.eu/station-exchange-format-sef) files.
+
 
 ---
 
-The [Rainfall Rescue project](https://climatelabbook.substack.com/p/rainfall-rescue-5-years-on)
-showed that historical weather records could be recovered from paper archives by
-an army of volunteers. Its successor,
-[Robot Rainfall Rescue](https://brohan.org/Robot_Rainfall_Rescue/), showed that
-an ensemble of small [vision-language models (VLMs)](https://huggingface.co/blog/vlms)
-could do the same job for the *monthly* rainfall sheets — matching volunteer
-accuracy without recruiting, training, and managing anyone.
-
-This project applies that approach to the far larger and harder collection of
-**daily** rainfall registers: about **660,000** scanned station-year images, each
+This project uses an ensemble of small [Vision Language Models (VLMs)](https://huggingface.co/blog/vlms) to transcribe [a collection of
+**daily** rainfall registers for England and Wales](https://digital.nmla.metoffice.gov.uk/SO_51194883-b9dd-4e27-93db-958f8fbea38b/): about **660,000** scanned station-year images, each
 a dense grid of daily rainfall totals. Success means converting every image into
 a structured table of numbers that can be ingested into a database.
 
@@ -29,9 +25,15 @@ totals. The task is to turn this into a table of numbers.
 
 ## The approach
 
-We don't try to impose our own structure on the problem. Instead we take small,
+The fundamental method is the same as that applied in [Robot Rainfall Rescue](https://brohan.org/Robot_Rainfall_Rescue/): We don't try to impose our own structure on the problem. Instead we take small,
 open-weight VLMs, fine-tune them on the rainfall task, and let them read the
-images directly into JSON. The work proceeds in staged rounds, and — importantly —
+images directly into JSON. The additional challenges for this project are threefold:
+
+- The images are more complex - more difficult for the VLMs to read. We deal with this by doing more fine-tuning.
+- We have **many** more images to read - time and cost become important factors. We deal with this by optimisation - reduced image size, maximum batch size, care in allocating jobs to GPUs.
+- We don't have any ground-truth data to fine-tune to. We deal with this with a two-stage data-free tuning method - first we fine tune to synthetic images, then we fine tune to ensemble consensus. 
+
+The work proceeds in staged rounds, and — importantly —
 **each round is driven by a notebook** that you can open, read, and run.
 
 1. **Preparation** — generate synthetic training data with known values, and
@@ -64,14 +66,27 @@ rainfall sheets), the models improve dramatically across the rounds:
 
 The raw models are hopeless — the best gets under two thirds of the values right.
 After two rounds of fine-tuning, every model is in the high eighties or better,
-and an ensemble that requires agreement between models does better still. As with
-the monthly sheets, this is comparable to human volunteers, and it scales.
+and an consensus that requires agreement between models does better still. The two-stage data-free tuning method is a powerful technique - despite having no ground-truth data we can fine-tune the VLM ensemble up to a sufficient quality for data rescue work.
+
+It's important to note that the method is not specific to this document type (the daily rainfall sheets). It should be possible to use the same technique on any document format.
 
 ## Get started
 
 - [Installation](installation.md) — set up the environment.
 - [Workflow overview](workflow/overview.md) — the staged, notebook-driven pipeline.
 - [How to reproduce and extend](reproduce.md) — code, compute, and credits.
+
+## Results
+
+ - [Raw transcriptions of the England and Wales daily-rainfall sheets.](https://doi.org/10.5281/zenodo.22078935)
+ These are raw transcriptions - a 5 member ensemble of transcriptions of the 372 daily values from each of the 660,000 sheets. Few people will be interested in these, their main value is as the input to the [next project in the chain](https://brohan.org/Auto-Daily-Rainfall-QC/), which turns them into useful observations.
+
+## Credits
+
+- [Authors and acknowledgements](credits.md)
+
+This document is distributed under the terms of the [Open Government Licence](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/2/). Source code included is distributed under the terms of the [BSD license](https://opensource.org/licenses/BSD-2-Clause).
+
 
 ```{toctree}
 :maxdepth: 2
@@ -80,6 +95,8 @@ the monthly sheets, this is comparable to human volunteers, and it scales.
 
 installation
 workflow/overview
+reproduce
+credits
 ```
 
 ```{toctree}
@@ -103,5 +120,4 @@ reference/cli
 reference/configuration
 reference/architecture
 reference/azure
-reproduce
 ```

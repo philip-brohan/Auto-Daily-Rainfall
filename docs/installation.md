@@ -15,7 +15,7 @@ prerequisite for reading and running the workflow notebooks.
 ## 1 — Clone the repository
 
 ```bash
-git clone https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO.git
+git clone https://github.com/Philip-Brohan/Auto-Daily-Rainfall.git
 cd Auto-Daily-Rainfall-MO
 ```
 

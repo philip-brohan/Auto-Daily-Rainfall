@@ -78,7 +78,7 @@ DEFAULT_ROOT = "SO_51194883-b9dd-4e27-93db-958f8fbea38b"
 DEFAULT_PORTAL = "https://digital.nmla.metoffice.gov.uk"
 USER_AGENT = (
     "Auto-Daily-Rainfall-MO/1.0 "
-    "(+https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO)"
+    "(+https://github.com/Philip-Brohan/Auto-Daily-Rainfall)"
 )
 
 # A result item in a folder listing looks like:

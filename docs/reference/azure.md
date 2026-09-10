@@ -387,6 +387,71 @@ Required checks after submission:
 
 ---
 
+## Backing up and restoring a workspace
+
+The GPU workspace is expensive to keep idle, so it can be torn down when not in
+use for an extended period.  A full teardown also destroys the storage account
+backing the datastore, so every datastore blob is lost.  Two scripts capture the
+irreplaceable contents to local disk and replay them into a freshly created bare
+workspace.
+
+The walkthrough notebook `notebooks/operations/backup_and_restore_workspace.ipynb`
+runs the whole cycle interactively.
+
+### Before teardown — back up
+
+```bash
+conda activate weather-doc-extractor
+bash scripts/aml_backup.sh --dest /data/backups/aml
+```
+
+The backup directory is **required** (via `--dest` or `AML_BACKUP_DIR`) and can
+be hundreds of GB, so point it at a large-capacity path outside the repository.
+The bundle contains:
+
+| Bundle location | Contents |
+|-----------------|----------|
+| `datastore/<path>` | Datastore blobs: transcriptions, `outputs/{checkpoints,extractions,eval}`, `consensus_data`, `test_data` |
+| `metadata/` | `model_registry.json`, `extraction_registry.json`, `config.env`, `azureml/*.yml` |
+| `manifest.json` | Index of everything captured |
+
+The 660k raw source images and `hf_cache` are **excluded by default**: the images
+are re-derivable from the NMLA archive (`scripts/download_documents.py` +
+`scripts/split_documents.py`) and the cache is re-downloaded automatically by
+jobs.  Add `--include-images` to also back up `$AML_IMAGES_PATH`.  The download
+is idempotent, so an interrupted backup is resumed simply by re-running it.  Use
+`--dry-run` to preview the `az storage` commands.
+
+### After spin-up — restore
+
+Spin up a fresh bare workspace first (this creates the workspace, its
+`large_datastore`, and the compute cluster).  Then repopulate it:
+
+```bash
+conda activate weather-doc-extractor
+bash scripts/aml_restore.sh --from /data/backups/aml
+```
+
+Restore performs two steps:
+
+1. **Re-register environments** — delegates to
+   `scripts/azure_register_environments.sh --variant both` (v100 + a100).
+2. **Re-upload datastore data** — replays every path recorded in the manifest
+   back to the datastore.
+
+Restore does **not** create the workspace, datastore, or compute cluster — those
+come from your bare-workspace spin-up.  Images are re-uploaded only if they were
+captured in the backup (or you pass `--include-images`).  Useful flags:
+
+| Flag | Effect |
+|------|--------|
+| `--skip-environments` | Only re-upload data |
+| `--skip-data` | Only re-register environments |
+| `--restore-metadata` | Copy the backed-up registries/config back into the repo |
+| `--dry-run` | Preview all commands with no changes |
+
+---
+
 ## Node setup (Azure Batch)
 
 `scripts/setup_env.sh` installs the Conda environment on a fresh Azure Batch node.

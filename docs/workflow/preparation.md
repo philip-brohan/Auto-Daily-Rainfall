@@ -6,9 +6,9 @@ stage builds all three.
 
 Three notebooks:
 
-- [download_document_images.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/download_document_images.ipynb)
-- [make_fake_daily_rainfall_training_data.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb)
-- [add_test_data_from_Ciara.ipynb](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb)
+- [download_document_images.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/download_document_images.ipynb)
+- [make_fake_daily_rainfall_training_data.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb)
+- [add_test_data_from_Ciara.ipynb](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb)
 
 ## The source document images
 
@@ -17,7 +17,7 @@ The raw material is the scanned daily-rainfall registers held by the Met Office
 (published under the Open Government Licence). The archive stores one multi-page
 PDF per county per decade; every page is one station-year rainfall table.
 
-The [download_document_images](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/download_document_images.ipynb)
+The [download_document_images](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/download_document_images.ipynb)
 notebook downloads those PDFs (`scripts/download_documents.py`) and splits them
 into single-page JPEGs (`scripts/split_documents.py`), named like
 `DRain_1871-1880_Cornwall-59.jpg`. Both steps are idempotent and support cluster
@@ -31,18 +31,18 @@ that lays them out into an image with the same structure as a real Daily Weather
 Record. So we generate about **1000 fake images** whose values we already know, and
 use them as training data.
 
-The [make_fake_daily_rainfall_training_data](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb)
+The [make_fake_daily_rainfall_training_data](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb)
 notebook produces paired `images/` and `transcriptions/` — each image with a JSON
 file holding its exact values. The capabilities the models learn on this synthetic
 data carry over to the real records.
 
-```{figure} ../_static/figures/sample_document.jpg
-:alt: A real daily rainfall register
-:width: 65%
+```{figure} ../_static/figures/real_vs_fake_document.jpg
+:alt: Real daily rainfall register beside a synthetic training image
+:width: 95%
 
-A real daily rainfall register. The synthetic images imitate this layout — the same
-day rows, month columns, and monthly totals — so that skills learned on fake data
-transfer to the real thing.
+Left: a real daily rainfall register. Right: a synthetic training image generated
+by this project. The synthetic images imitate the same day rows, month columns,
+and monthly totals so that skills learned on fake data transfer to the real thing.
 ```
 
 ## Real test data
@@ -53,7 +53,7 @@ images with known-good values. **Ciara Ryan** transcribed and quality-controlled
 records we are targeting. Sixty-four images is not enough to train on, but it is
 ideal for validation.
 
-The [add_test_data_from_Ciara](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb)
+The [add_test_data_from_Ciara](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb)
 notebook reformats her results into the project's `images/` + `transcriptions/`
 layout, giving a trustworthy real-data test set that every later stage measures
 against.

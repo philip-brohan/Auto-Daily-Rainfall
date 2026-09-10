@@ -116,11 +116,22 @@ DATASTORE_NAME="$(echo "$AML_DATASTORE_BASE" | sed 's|.*/datastores/||;s|/paths.
 STORAGE_ACCOUNT=""
 CONTAINER=""
 
+# azcopy reuses the current `az login` credentials and honours DOWNLOAD_JOBS as
+# its transfer concurrency.
+export AZCOPY_AUTO_LOGIN_TYPE="${AZCOPY_AUTO_LOGIN_TYPE:-AZCLI}"
+export AZCOPY_CONCURRENCY_VALUE="${AZCOPY_CONCURRENCY_VALUE:-$DOWNLOAD_JOBS}"
+
 # ── Resolve storage account and container (skipped in dry-run) ────────────────
 if $DRY_RUN; then
     echo "[dry-run] Would resolve datastore '$DATASTORE_NAME' in workspace '$AML_WORKSPACE'"
     echo
 else
+    if ! command -v azcopy >/dev/null 2>&1; then
+        echo "Error: azcopy not found on PATH." >&2
+        echo "       azcopy is required to download folder-marker blobs correctly." >&2
+        echo "       Install it from https://aka.ms/downloadazcopy and retry." >&2
+        exit 1
+    fi
     echo "Resolving datastore '$DATASTORE_NAME' in workspace '$AML_WORKSPACE'..."
     DATASTORE_JSON="$(az ml datastore show \
         --name "$DATASTORE_NAME" \
@@ -135,42 +146,47 @@ else
 fi
 
 # ── Download helper ───────────────────────────────────────────────────────────
-# Uses az storage blob download-batch for bulk parallel transfer (much faster
-# than per-blob downloads).  Zero-size "directory marker" blobs can cause
-# download-batch to create empty files that block subsequent directory
-# creation; we remove any such zero-byte files afterwards.
+# Uses azcopy for bulk parallel transfer.  Azure ML writes a zero-byte
+# "hdi_isfolder" marker blob for every folder level (a blob named <dir>
+# alongside the real files under <dir>/...).  `az storage blob download-batch`
+# downloads such a marker as a file and then aborts with "[Errno 20] Not a
+# directory" when it needs that same name as a directory.  azcopy understands
+# these markers and materialises them as directories.  --as-subdir=false places
+# the source contents directly under $dst; --overwrite=ifSourceNewer makes
+# re-runs idempotent and resumable.
 do_download() {
     local src_path="$1"   # path prefix in the container, e.g. foo/outputs/extractions
     local dst="$2"        # local destination directory
+    local url="https://${STORAGE_ACCOUNT}.blob.core.windows.net/${CONTAINER}/${src_path}"
     mkdir -p "$dst"
     if $DRY_RUN; then
-        echo "[dry-run] az storage blob download-batch \\"
-        echo "    --account-name <account> --auth-mode login \\"
-        echo "    --source <container> --pattern '${src_path}/*' \\"
-        echo "    --destination <tmpdir> --max-connections ${DOWNLOAD_JOBS} --overwrite true"
-        echo "    (then move <tmpdir>/${src_path}/ → $dst)"
+        echo "[dry-run] azcopy copy \\"
+        echo "    'https://<account>.blob.core.windows.net/<container>/${src_path}' \\"
+        echo "    '$dst' --recursive --as-subdir=false --overwrite=ifSourceNewer"
     else
         echo "Downloading from: ${src_path}"
         echo "             to:  $dst"
         echo "         workers: ${DOWNLOAD_JOBS}"
-        local tmp_dir
-        tmp_dir=$(mktemp -d)
-        az storage blob download-batch \
+        # Skip paths with no blobs so azcopy does not error on an empty source.
+        local found
+        found="$(az storage blob list \
             --account-name "$STORAGE_ACCOUNT" \
             --auth-mode login \
-            --source "$CONTAINER" \
-            --destination "$tmp_dir" \
-            --pattern "${src_path}/*" \
-            --max-connections "${DOWNLOAD_JOBS}" \
-            --overwrite true \
-            $($QUIET && echo "--only-show-errors" || true)
-        # Move contents from prefix subdir to final destination, removing
-        # any zero-byte directory marker files left by download-batch.
-        find "$tmp_dir/${src_path}" -type f -empty -delete
-        mkdir -p "$dst"
-        cp -a "$tmp_dir/${src_path}/." "$dst/"
-        rm -rf "$tmp_dir"
-        echo "Done."
+            --container-name "$CONTAINER" \
+            --prefix "${src_path}/" \
+            --num-results 1 \
+            --query "[0].name" \
+            --output tsv 2>/dev/null)"
+        if [[ -z "$found" ]]; then
+            echo "  (no blobs found under ${src_path}/ — skipping)"
+        else
+            azcopy copy "$url" "$dst" \
+                --recursive \
+                --as-subdir=false \
+                --overwrite=ifSourceNewer \
+                --output-level "$($QUIET && echo quiet || echo essential)"
+            echo "Done."
+        fi
     fi
     echo
 }

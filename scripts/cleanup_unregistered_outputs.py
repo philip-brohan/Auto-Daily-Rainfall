@@ -220,8 +220,20 @@ def _build_azure_context(config_env: dict[str, str]) -> AzureContext:
     )
 
 
-def _list_azure_suffixes(ctx: AzureContext, kind: str) -> set[str]:
-    prefix = f"{ctx.aml_outputs_path}/{kind}/".strip("/")
+def _list_child_dirs(ctx: AzureContext, prefix: str) -> list[str]:
+    """Return the immediate child "directory" prefixes directly under ``prefix``.
+
+    Uses a *delimited* listing so Azure returns only the entries at this single
+    level (virtual directories plus any blobs), not every blob beneath the
+    prefix.  This keeps memory bounded to the number of directories rather than
+    the number of files, which matters because a full recursive listing of the
+    extractions (potentially hundreds of thousands of blobs) buffers the entire
+    result in memory and can exhaust RAM on low-resource machines.
+
+    Virtual directories come back from the CLI with a trailing "/"; plain blobs
+    at this level are ignored.  Returned values have the trailing slash removed.
+    """
+    prefix = prefix.rstrip("/") + "/"
     out = _run_az(
         [
             "az",
@@ -236,29 +248,37 @@ def _list_azure_suffixes(ctx: AzureContext, kind: str) -> set[str]:
             ctx.container,
             "--prefix",
             prefix,
+            "--delimiter",
+            "/",
             "--num-results",
             "*",
+            "--query",
+            "[].name",
             "--output",
-            "json",
+            "tsv",
         ]
     )
-    blobs = json.loads(out)
+    dirs: list[str] = []
+    for line in out.splitlines():
+        name = line.strip()
+        if name.endswith("/"):
+            dirs.append(name.rstrip("/"))
+    return dirs
 
+
+def _list_azure_suffixes(ctx: AzureContext, kind: str) -> set[str]:
+    base = f"{ctx.aml_outputs_path}/{kind}".strip("/")
+
+    # Managed artifacts live at depth 2 under the kind: <kind>/<first>/<second>.
+    # Enumerate one directory level at a time (via delimited listings) so we
+    # never materialize the full recursive blob listing in memory.
     suffixes: set[str] = set()
-    for blob in blobs:
-        name = str(blob.get("name", "")).strip("/")
-        if not name.startswith(prefix):
-            continue
-        rest = name[len(prefix) :].strip("/")
-        if not rest:
-            continue
-        parts = [p for p in rest.split("/") if p]
-        # We only treat depth-2 directories as managed artifacts:
-        #   checkpoints/<a>/<b>/... and extractions/<a>/<b>/...
-        # Requiring at least 3 segments avoids misclassifying file paths like
-        # checkpoints/<model>/README.md as artifact prefixes.
-        if len(parts) >= 3:
-            suffixes.add(f"{parts[0]}/{parts[1]}")
+    for first_dir in _list_child_dirs(ctx, base):
+        for second_dir in _list_child_dirs(ctx, first_dir):
+            rest = second_dir[len(base) :].strip("/")
+            parts = [p for p in rest.split("/") if p]
+            if len(parts) >= 2:
+                suffixes.add(f"{parts[0]}/{parts[1]}")
     return suffixes
 
 

@@ -2,11 +2,11 @@
 
 This project is designed to be reproduced and extended. Everything — code, notebooks,
 environment specification, and this documentation — lives in a single Git repository:
-[github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO).
+[github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO](https://github.com/Philip-Brohan/Auto-Daily-Rainfall).
 
 If you are familiar with GitHub, fork or clone the repository. If you'd rather not,
 you can download the whole thing as a
-[zip file](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/archive/refs/heads/main.zip).
+[zip file](https://github.com/Philip-Brohan/Auto-Daily-Rainfall/archive/refs/heads/main.zip).
 
 ## Software environment
 
@@ -44,21 +44,6 @@ To build them locally:
 pip install sphinx myst-parser
 sphinx-build -b html docs docs/_build/html
 ```
-
-## Credits and acknowledgements
-
-This is a follow-on to [Robot Rainfall Rescue](https://brohan.org/Robot_Rainfall_Rescue/),
-which established the small-VLM approach on the monthly rainfall sheets.
-
-The real-data validation set — 64 daily rainfall images with careful,
-quality-controlled transcriptions — was provided by **Ciara Ryan**, who
-transcribed Irish daily rainfall sheets during her PhD. These known-good
-transcriptions are what let us measure how well the models are really doing.
-
-## Contact
-
-- [Raise an issue](https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/issues/new)
-- Contact [Philip Brohan](mailto:philip.brohan@metoffice.gov.uk)
 
 This document is distributed under the terms of the
 [Open Government Licence](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/2/).
