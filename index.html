@@ -32,18 +32,15 @@
             
   <section id="auto-daily-rainfall">
 <h1>Auto Daily Rainfall<a class="headerlink" href="#auto-daily-rainfall" title="Link to this heading">¶</a></h1>
-<p><strong>Rescuing daily rainfall observations from historical documents, using small
-vision-language models instead of thousands of human volunteers.</strong></p>
+<p>This is the second in a set of three projects demonstrating a 100% AI method to do large-scale <a class="reference external" href="https://climate.copernicus.eu/sites/default/files/2020-02/BestPracticeGuidelines_ClimateDataRescue_0.pdf">Climate Data Rescue</a>:</p>
+<ul class="simple">
+<li><p><strong><a class="reference external" href="https://brohan.org/Robot_Rainfall_Rescue/">Robot Rainfall Rescue</a></strong> demonstrated the basic approach: How to fine-tune an ensemble of small Vision Language Models to convert a large collection of photographs of historical documents containing numerical weather records into computer-readable form.</p></li>
+<li><p><strong>This Project</strong> applies the approach to the 660,000 pages of the UK Daily Rainfall Reports (England and Wales). It demonstrates fine-tuning without any training data, and produces a full ensemble transcription.</p></li>
+<li><p><strong><a class="reference external" href="https://brohan.org/Auto-Daily-Rainfall-QC/">Auto Daily Rainfall QC</a></strong> takes the raw transcriptions, applies metadata (locations and dates), does basic QC and deduplication, and outputs <a class="reference external" href="https://doi.org/10.5281/zenodo.21905160">73 million daily rainfall observations</a> as ready-to-use <a class="reference external" href="https://datarescue.climate.copernicus.eu/station-exchange-format-sef">Station Exchange Format (SEF)</a> files.</p></li>
+</ul>
 <hr class="docutils" />
-<p>The <a class="reference external" href="https://climatelabbook.substack.com/p/rainfall-rescue-5-years-on">Rainfall Rescue project</a>
-showed that historical weather records could be recovered from paper archives by
-an army of volunteers. Its successor,
-<a class="reference external" href="https://brohan.org/Robot_Rainfall_Rescue/">Robot Rainfall Rescue</a>, showed that
-an ensemble of small <a class="reference external" href="https://huggingface.co/blog/vlms">vision-language models (VLMs)</a>
-could do the same job for the <em>monthly</em> rainfall sheets — matching volunteer
-accuracy without recruiting, training, and managing anyone.</p>
-<p>This project applies that approach to the far larger and harder collection of
-<strong>daily</strong> rainfall registers: about <strong>660,000</strong> scanned station-year images, each
+<p>This project uses an ensemble of small <a class="reference external" href="https://huggingface.co/blog/vlms">Vision Language Models (VLMs)</a> to transcribe <a class="reference external" href="https://digital.nmla.metoffice.gov.uk/SO_51194883-b9dd-4e27-93db-958f8fbea38b/">a collection of
+<strong>daily</strong> rainfall registers for England and Wales</a>: about <strong>660,000</strong> scanned station-year images, each
 a dense grid of daily rainfall totals. Success means converting every image into
 a structured table of numbers that can be ingested into a database.</p>
 <figure class="align-default" id="id1">
@@ -57,9 +54,15 @@ totals. The task is to turn this into a table of numbers.</span><a class="header
 </figure>
 <section id="the-approach">
 <h2>The approach<a class="headerlink" href="#the-approach" title="Link to this heading">¶</a></h2>
-<p>We don’t try to impose our own structure on the problem. Instead we take small,
+<p>The fundamental method is the same as that applied in <a class="reference external" href="https://brohan.org/Robot_Rainfall_Rescue/">Robot Rainfall Rescue</a>: We don’t try to impose our own structure on the problem. Instead we take small,
 open-weight VLMs, fine-tune them on the rainfall task, and let them read the
-images directly into JSON. The work proceeds in staged rounds, and — importantly —
+images directly into JSON. The additional challenges for this project are threefold:</p>
+<ul class="simple">
+<li><p>The images are more complex - more difficult for the VLMs to read. We deal with this by doing more fine-tuning.</p></li>
+<li><p>We have <strong>many</strong> more images to read - time and cost become important factors. We deal with this by optimisation - reduced image size, maximum batch size, care in allocating jobs to GPUs.</p></li>
+<li><p>We don’t have any ground-truth data to fine-tune to. We deal with this with a two-stage data-free tuning method - first we fine tune to synthetic images, then we fine tune to ensemble consensus.</p></li>
+</ul>
+<p>The work proceeds in staged rounds, and — importantly —
 <strong>each round is driven by a notebook</strong> that you can open, read, and run.</p>
 <ol class="arabic simple">
 <li><p><strong>Preparation</strong> — generate synthetic training data with known values, and
@@ -118,8 +121,8 @@ rainfall sheets), the models improve dramatically across the rounds:</p>
 <p><em>Per-cell accuracy against hand-transcribed ground truth.</em></p>
 <p>The raw models are hopeless — the best gets under two thirds of the values right.
 After two rounds of fine-tuning, every model is in the high eighties or better,
-and an ensemble that requires agreement between models does better still. As with
-the monthly sheets, this is comparable to human volunteers, and it scales.</p>
+and an consensus that requires agreement between models does better still. The two-stage data-free tuning method is a powerful technique - despite having no ground-truth data we can fine-tune the VLM ensemble up to a sufficient quality for data rescue work.</p>
+<p>It’s important to note that the method is not specific to this document type (the daily rainfall sheets). It should be possible to use the same technique on any document format.</p>
 </section>
 <section id="get-started">
 <h2>Get started<a class="headerlink" href="#get-started" title="Link to this heading">¶</a></h2>
@@ -128,6 +131,20 @@ the monthly sheets, this is comparable to human volunteers, and it scales.</p>
 <li><p><a class="reference internal" href="workflow/overview.html"><span class="std std-doc">Workflow overview</span></a> — the staged, notebook-driven pipeline.</p></li>
 <li><p><a class="reference internal" href="reproduce.html"><span class="std std-doc">How to reproduce and extend</span></a> — code, compute, and credits.</p></li>
 </ul>
+</section>
+<section id="results">
+<h2>Results<a class="headerlink" href="#results" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://doi.org/10.5281/zenodo.22078935">Raw transcriptions of the England and Wales daily-rainfall sheets.</a>
+These are raw transcriptions - a 5 member ensemble of transcriptions of the 372 daily values from each of the 660,000 sheets. Few people will be interested in these, their main value is as the input to the <a class="reference external" href="https://brohan.org/Auto-Daily-Rainfall-QC/">next project in the chain</a>, which turns them into useful observations.</p></li>
+</ul>
+</section>
+<section id="credits">
+<h2>Credits<a class="headerlink" href="#credits" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="credits.html"><span class="std std-doc">Authors and acknowledgements</span></a></p></li>
+</ul>
+<p>This document is distributed under the terms of the <a class="reference external" href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/2/">Open Government Licence</a>. Source code included is distributed under the terms of the <a class="reference external" href="https://opensource.org/licenses/BSD-2-Clause">BSD license</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 <div class="toctree-wrapper compound">
@@ -152,6 +169,8 @@ the monthly sheets, this is comparable to human volunteers, and it scales.</p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="workflow/overview.html">Workflow overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reproduce.html">How to reproduce and extend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="credits.html">Authors and acknowledgements</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
 <ul>
@@ -167,7 +186,6 @@ the monthly sheets, this is comparable to human volunteers, and it scales.</p>
 <li class="toctree-l1"><a class="reference internal" href="reference/configuration.html">Configuration Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/azure.html">HPC and Azure ML</a></li>
-<li class="toctree-l1"><a class="reference internal" href="reproduce.html">How to reproduce and extend</a></li>
 </ul>
 
   <div role="note" aria-label="source link">

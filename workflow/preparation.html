@@ -13,7 +13,7 @@
     <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Zeroth order — the baseline" href="zeroth-order.html" />
-    <link rel="prev" title="Workflow overview" href="overview.html" /> 
+    <link rel="prev" title="Authors and acknowledgements" href="../credits.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="Related">
       <h3>Navigation</h3>
@@ -22,7 +22,7 @@
           <a href="zeroth-order.html" title="Zeroth order — the baseline"
              accesskey="N">next</a></li>
         <li class="right" >
-          <a href="overview.html" title="Workflow overview"
+          <a href="../credits.html" title="Authors and acknowledgements"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Preparation</a></li> 
@@ -41,9 +41,9 @@ plus two datasets: something to <em>train</em> on, and something to <em>test</em
 stage builds all three.</p>
 <p>Three notebooks:</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/download_document_images.ipynb">download_document_images.ipynb</a></p></li>
-<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb">make_fake_daily_rainfall_training_data.ipynb</a></p></li>
-<li><p><a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb">add_test_data_from_Ciara.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/download_document_images.ipynb">download_document_images.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb">make_fake_daily_rainfall_training_data.ipynb</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb">add_test_data_from_Ciara.ipynb</a></p></li>
 </ul>
 <section id="the-source-document-images">
 <h2>The source document images<a class="headerlink" href="#the-source-document-images" title="Link to this heading">¶</a></h2>
@@ -51,7 +51,7 @@ stage builds all three.</p>
 <a class="reference external" href="https://digital.nmla.metoffice.gov.uk/index.php?name=SO_51194883-b9dd-4e27-93db-958f8fbea38b">National Meteorological Library and Archive</a>
 (published under the Open Government Licence). The archive stores one multi-page
 PDF per county per decade; every page is one station-year rainfall table.</p>
-<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/download_document_images.ipynb">download_document_images</a>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/download_document_images.ipynb">download_document_images</a>
 notebook downloads those PDFs (<code class="docutils literal notranslate"><span class="pre">scripts/download_documents.py</span></code>) and splits them
 into single-page JPEGs (<code class="docutils literal notranslate"><span class="pre">scripts/split_documents.py</span></code>), named like
 <code class="docutils literal notranslate"><span class="pre">DRain_1871-1880_Cornwall-59.jpg</span></code>. Both steps are idempotent and support cluster
@@ -64,17 +64,17 @@ solve. But the reverse is easy: given some numbers, we can write a Python progra
 that lays them out into an image with the same structure as a real Daily Weather
 Record. So we generate about <strong>1000 fake images</strong> whose values we already know, and
 use them as training data.</p>
-<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb">make_fake_daily_rainfall_training_data</a>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/make_fake_daily_rainfall_training_data.ipynb">make_fake_daily_rainfall_training_data</a>
 notebook produces paired <code class="docutils literal notranslate"><span class="pre">images/</span></code> and <code class="docutils literal notranslate"><span class="pre">transcriptions/</span></code> — each image with a JSON
 file holding its exact values. The capabilities the models learn on this synthetic
 data carry over to the real records.</p>
 <figure class="align-default" id="id1">
-<a class="reference internal image-reference" href="../_images/sample_document.jpg"><img alt="A real daily rainfall register" src="../_images/sample_document.jpg" style="width: 65%;" />
+<a class="reference internal image-reference" href="../_images/real_vs_fake_document.jpg"><img alt="Real daily rainfall register beside a synthetic training image" src="../_images/real_vs_fake_document.jpg" style="width: 95%;" />
 </a>
 <figcaption>
-<p><span class="caption-text">A real daily rainfall register. The synthetic images imitate this layout — the same
-day rows, month columns, and monthly totals — so that skills learned on fake data
-transfer to the real thing.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+<p><span class="caption-text">Left: a real daily rainfall register. Right: a synthetic training image generated
+by this project. The synthetic images imitate the same day rows, month columns,
+and monthly totals so that skills learned on fake data transfer to the real thing.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
 </figcaption>
 </figure>
 </section>
@@ -85,7 +85,7 @@ images with known-good values. <strong>Ciara Ryan</strong> transcribed and quali
 64 Irish daily rainfall sheets during her PhD; these share the format of the UK
 records we are targeting. Sixty-four images is not enough to train on, but it is
 ideal for validation.</p>
-<p>The <a class="reference external" href="https://github.com/Philip-Brohan-MO/Auto-Daily-Rainfall-MO/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb">add_test_data_from_Ciara</a>
+<p>The <a class="reference external" href="https://github.com/Philip-Brohan/Auto-Daily-Rainfall/blob/main/notebooks/preparation/add_test_data_from_Ciara.ipynb">add_test_data_from_Ciara</a>
 notebook reformats her results into the project’s <code class="docutils literal notranslate"><span class="pre">images/</span></code> + <code class="docutils literal notranslate"><span class="pre">transcriptions/</span></code>
 layout, giving a trustworthy real-data test set that every later stage measures
 against.</p>
@@ -116,6 +116,8 @@ against.</p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="overview.html">Workflow overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reproduce.html">How to reproduce and extend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits.html">Authors and acknowledgements</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">The workflow</span></p>
 <ul class="current">
@@ -131,7 +133,6 @@ against.</p>
 <li class="toctree-l1"><a class="reference internal" href="../reference/configuration.html">Configuration Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/azure.html">HPC and Azure ML</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../reproduce.html">How to reproduce and extend</a></li>
 </ul>
 
   <div role="note" aria-label="source link">
@@ -152,7 +153,7 @@ against.</p>
           <a href="zeroth-order.html" title="Zeroth order — the baseline"
              >next</a></li>
         <li class="right" >
-          <a href="overview.html" title="Workflow overview"
+          <a href="../credits.html" title="Authors and acknowledgements"
              >previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="../index.html">ADR</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Preparation</a></li> 
